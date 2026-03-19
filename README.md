@@ -1,36 +1,59 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Claude Code 对话历史查看器
 
-## Getting Started
+浏览和管理你与 Claude Code 的所有对话历史。
 
-First, run the development server:
+## 功能
+
+- 📁 查看所有 Claude Code 项目列表
+- 📋 浏览每个项目的会话记录
+- 💬 查看完整的对话内容（用户 + AI）
+- 🔄 消息展开/收起功能
+
+## 技术栈
+
+- **Next.js 16** - App Router
+- **TypeScript**
+- **Tailwind CSS**
+
+## 快速开始
 
 ```bash
+# 克隆项目
+git clone git@github.com:OrangeSAM/cc-history.git
+cd cc-history
+
+# 安装依赖
+npm install
+
+# 启动开发服务器
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+打开 http://localhost:3000 查看。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 项目结构
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```
+src/
+├── app/
+│   ├── page.tsx                    # 首页 - 项目列表
+│   ├── api/
+│   │   └── projects/
+│   │       ├── route.ts            # 获取项目列表
+│   │       └── [slug]/
+│   │           └── sessions/
+│   │               ├── route.ts    # 获取会话列表
+│   │               └── [sessionId]/
+│   │                   └── route.ts # 获取消息
+│   └── projects/
+│       ├── [slug]/page.tsx         # 项目详情页
+│       └── [slug]/[sessionId]/page.tsx  # 对话详情页
+```
 
-## Learn More
+## 数据来源
 
-To learn more about Next.js, take a look at the following resources:
+对话历史来自 `~/.claude/projects/` 目录。
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## License
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT
