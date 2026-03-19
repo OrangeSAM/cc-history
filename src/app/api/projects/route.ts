@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
-
-const PROJECTS_DIR = path.join(process.env.HOME || '/Users/liuyibi', '.claude/projects')
+import os from 'os'
 
 interface Project {
   id: string
@@ -13,16 +12,19 @@ interface Project {
 }
 
 function getProjects(): Project[] {
-  if (!fs.existsSync(PROJECTS_DIR)) {
+  const homeDir = os.homedir()
+  const projectsDir = path.join(homeDir, '.claude/projects')
+
+  if (!fs.existsSync(projectsDir)) {
     return []
   }
 
-  const entries = fs.readdirSync(PROJECTS_DIR, { withFileTypes: true })
+  const entries = fs.readdirSync(projectsDir, { withFileTypes: true })
 
   return entries
     .filter(entry => entry.isDirectory() && !entry.name.startsWith('.'))
     .map(entry => {
-      const projectPath = path.join(PROJECTS_DIR, entry.name)
+      const projectPath = path.join(projectsDir, entry.name)
       const files = fs.readdirSync(projectPath).filter(f => f.endsWith('.jsonl'))
 
       let lastModified = ''
