@@ -3,11 +3,12 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import { invoke } from '@tauri-apps/api/core'
 
 interface Session {
   id: string
   name: string
-  lastModified: string
+  last_modified: string
   size: number
 }
 
@@ -20,13 +21,13 @@ export default function ProjectPage() {
 
   useEffect(() => {
     if (!slug) return
-    fetch(`/api/projects/${slug}/sessions`)
-      .then(res => res.json())
+    invoke<Session[]>('get_sessions', { projectId: slug })
       .then(data => {
-        setSessions(data.sessions || [])
+        setSessions(data || [])
         setLoading(false)
       })
       .catch(err => {
+        console.error('Error:', err)
         setError('Failed to load sessions')
         setLoading(false)
       })
@@ -86,7 +87,7 @@ export default function ProjectPage() {
                     {session.id}
                   </h3>
                   <p className="text-sm text-gray-500 mt-1">
-                    {new Date(session.lastModified).toLocaleString('zh-CN')}
+                    {session.last_modified ? new Date(parseInt(session.last_modified) * 1000).toLocaleString('zh-CN') : ''}
                   </p>
                 </div>
                 <span className="text-sm text-gray-400">

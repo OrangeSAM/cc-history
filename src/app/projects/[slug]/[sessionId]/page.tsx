@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import { invoke } from '@tauri-apps/api/core'
 
 interface Message {
   id: string
@@ -65,6 +66,63 @@ function MessageItem({ msg, idx }: { msg: Message; idx: number }) {
   )
 }
 
+function parseMessages(content: string): Message[] {
+  const lines = content.split('\n').filter(line => line.trim())
+  const messages: Message[] = []
+
+  for (const line of lines) {
+    try {
+      const data = JSON.parse(line)
+      const type = data.type
+
+      if (type === 'file-history-snapshot') {
+        messages.push({
+          id: data.messageId || data.snapshot?.messageId || '',
+          type: 'snapshot',
+          content: `File snapshot: ${Object.keys(data.snapshot?.trackedFileBackups || {}).join(', ') || 'No files'}`,
+          timestamp: data.timestamp || data.snapshot?.timestamp || ''
+        })
+      } else if (type === 'user') {
+        const content = data.message?.content
+        let text = ''
+        if (typeof content === 'string') {
+          text = content
+        } else if (Array.isArray(content)) {
+          text = content.map((c: any) => c.text || c.content || '').join('')
+        }
+        messages.push({
+          id: data.uuid || data.messageId || '',
+          type: 'user',
+          content: text,
+          timestamp: data.timestamp || ''
+        })
+      } else if (type === 'assistant') {
+        const content = data.message?.content
+        let text = ''
+        if (typeof content === 'string') {
+          text = content
+        } else if (Array.isArray(content)) {
+          text = content.map((c: any) => {
+            if (c.type === 'text') return c.text || ''
+            if (c.type === 'thinking') return c.thinking || ''
+            return c.content || c.text || ''
+          }).join('\n\n')
+        }
+        messages.push({
+          id: data.uuid || data.message?.id || '',
+          type: 'assistant',
+          content: text,
+          timestamp: data.timestamp || ''
+        })
+      }
+    } catch (e) {
+      // Skip invalid JSON lines
+    }
+  }
+
+  return messages
+}
+
 export default function SessionPage() {
   const params = useParams()
   const slug = params.slug as string
@@ -75,13 +133,25 @@ export default function SessionPage() {
 
   useEffect(() => {
     if (!slug || !sessionId) return
-    fetch(`/api/projects/${slug}/sessions/${sessionId}`)
-      .then(res => res.json())
-      .then(data => {
-        setMessages(data.messages || [])
+
+    // First get the sessions to find the path
+    invoke<any[]>('get_sessions', { projectId: slug })
+      .then(sessions => {
+        const session = sessions.find((s: any) => s.id === sessionId)
+        if (!session) {
+          throw new Error('Session not found')
+        }
+        return session.path
+      })
+      .then(path => {
+        return invoke<string>('get_messages', { sessionPath: path })
+      })
+      .then(content => {
+        setMessages(parseMessages(content))
         setLoading(false)
       })
       .catch(err => {
+        console.error('Error:', err)
         setError('Failed to load messages')
         setLoading(false)
       })

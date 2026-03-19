@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { invoke } from '@tauri-apps/api/core'
 
 interface Project {
   id: string
   name: string
   path: string
-  sessionCount: number
-  lastModified: string
+  session_count: number
+  last_modified: string
 }
 
 export default function Home() {
@@ -17,13 +18,13 @@ export default function Home() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    fetch('/api/projects')
-      .then(res => res.json())
+    invoke<Project[]>('get_projects')
       .then(data => {
-        setProjects(data.projects || [])
+        setProjects(data || [])
         setLoading(false)
       })
       .catch(err => {
+        console.error('Error:', err)
         setError('Failed to load projects')
         setLoading(false)
       })
@@ -66,8 +67,8 @@ export default function Home() {
                 {project.name}
               </h2>
               <div className="mt-3 flex items-center justify-between text-sm text-gray-500">
-                <span>{project.sessionCount} 个会话</span>
-                <span>{new Date(project.lastModified).toLocaleDateString('zh-CN')}</span>
+                <span>{project.session_count} 个会话</span>
+                <span>{project.last_modified ? new Date(parseInt(project.last_modified) * 1000).toLocaleDateString('zh-CN') : ''}</span>
               </div>
             </Link>
           ))}
