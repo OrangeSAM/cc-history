@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "CC History",
   "version": "0.1.0",
-  "identifier": "com.cchistory.app",
+  "identifier": "com.cchistory.desktop",
   "build": {
     "frontendDist": "../.next/server/app",
     "devUrl": "http://localhost:3000",
