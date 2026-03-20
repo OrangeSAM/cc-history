@@ -10,7 +10,7 @@
   "app": {
     "windows": [
       {
-        "title": "Claude Code 历史查看器",
+        "title": "Claude Code 历史",
         "width": 1000,
         "height": 700,
         "resizable": true,
