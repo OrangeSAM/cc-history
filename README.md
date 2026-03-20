@@ -7,7 +7,7 @@
 - 查看所有 Claude Code 项目列表
 - 浏览每个项目的会话记录
 - 查看完整的对话内容（用户 + AI）
-- 消息展开/收起功能
+- 消息大纲导航
 
 ## 为什么做这个
 
@@ -18,42 +18,33 @@ Claude Code 的对话历史存储在本地 `~/.claude/projects/` 目录，但无
 | 层次 | 技术 |
 |------|------|
 | 桌面框架 | **Tauri 2.x** (Rust) |
-| 前端框架 | **Next.js 16** (App Router) |
+| 前端框架 | **Vue 3** + **Vite** |
 | 语言 | **TypeScript** |
-| 样式 | **Tailwind CSS** |
+| 样式 | **Tailwind CSS 4** |
 
 ## 目录结构
 
 ```
 claude-history-viewer/
-├── src/                          # Next.js 前端源码
-│   └── app/                      # App Router 页面
-│       ├── page.tsx              # 首页 - 项目列表
-│       ├── layout.tsx            # 根布局
-│       └── projects/             # 项目页面路由
-│           ├── [slug]/           # 项目详情页
-│           │   └── page.tsx      # 会话列表
-│           └── [slug]/[sessionId]/
-│               └── page.tsx      # 会话消息页
+├── frontend/                      # Vue 前端项目
+│   ├── src/
+│   │   ├── views/                # 页面组件
+│   │   │   ├── HomeView.vue      # 首页 - 项目列表
+│   │   │   ├── ProjectView.vue   # 项目会话列表
+│   │   │   └── SessionView.vue   # 会话详情
+│   │   ├── router/               # Vue Router 配置
+│   │   ├── api/                  # API 调用 (Tauri IPC)
+│   │   └── types/                # TypeScript 类型定义
+│   ├── package.json
+│   └── vite.config.ts
 ├── src-tauri/                    # Tauri 后端 (Rust)
 │   ├── src/
 │   │   ├── lib.rs                # Rust 业务逻辑
 │   │   └── main.rs               # 入口文件
 │   ├── Cargo.toml                # Rust 依赖配置
 │   └── tauri.conf.json           # Tauri 应用配置
-├── public/                       # 静态资源
-├── package.json                  # Node.js 依赖
-└── next.config.ts                # Next.js 配置
+└── package.json                  # 项目配置
 ```
-
-### 目录详解
-
-- **`src/app/`** - Next.js 16 App Router 页面目录
-- **`src/app/page.tsx`** - 首页，显示项目列表
-- **`src/app/projects/[slug]/page.tsx`** - 单个项目页面，显示会话列表
-- **`src/app/projects/[slug]/[sessionId]/page.tsx`** - 会话详情页面，显示对话消息
-- **`src-tauri/src/lib.rs`** - Tauri 后端核心逻辑，提供文件读取 API
-- **`src-tauri/tauri.conf.json`** - Tauri 窗口、构建等配置
 
 ## 快速开始
 
@@ -67,19 +58,15 @@ npm install
 
 | 命令 | 说明 |
 |------|------|
+| `npm run dev` | 开发模式，启动前端热更新 |
 | `npm run tauri:dev` | 开发模式，启动桌面应用窗口 |
 | `npm run tauri:build` | 打包成 macOS 应用 |
-| `npm run lint` | 运行 ESLint 检查代码 |
-
-> **注意**：由于前端依赖 Tauri 后端的 IPC API，单独运行前端 (`npm run dev`) 没有意义，必须通过 Tauri 命令启动。
 
 ### 开发模式
 
 ```bash
 npm run tauri:dev
 ```
-
-这会同时启动 Next.js 开发服务器和 Tauri 桌面应用窗口。
 
 ### 打包发布
 
