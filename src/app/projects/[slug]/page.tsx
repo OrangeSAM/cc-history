@@ -13,9 +13,18 @@ interface SessionPreview {
 }
 
 function SessionCard({ session, slug }: { session: SessionPreview; slug: string }) {
-  const date = session.last_modified
-    ? new Date(parseInt(session.last_modified) * 1000)
-    : null
+  // 解析时间戳 - 支持秒级时间戳或毫秒级时间戳
+  let date: Date | null = null
+  if (session.last_modified) {
+    const timestamp = parseInt(session.last_modified, 10)
+    if (!isNaN(timestamp)) {
+      // 如果时间戳小于 10000000000，认为是秒级，转换为毫秒
+      date = new Date(timestamp < 10000000000 ? timestamp * 1000 : timestamp)
+    }
+  }
+
+  // 检查日期是否有效
+  const isValidDate = date && !isNaN(date.getTime())
 
   return (
     <Link
@@ -41,7 +50,7 @@ function SessionCard({ session, slug }: { session: SessionPreview; slug: string 
             <p className="text-sm text-gray-400 italic">暂无预览</p>
           )}
         </div>
-        {date && (
+        {isValidDate && (
           <div className="text-right flex-shrink-0">
             <p className="text-xs text-gray-500">
               {date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
