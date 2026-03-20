@@ -1,22 +1,17 @@
-# Claude Code 对话历史查看器
+# Claude Code 历史查看器
 
 桌面端应用，用于浏览和管理你与 Claude Code 的所有对话历史。
 
-## 是什么
+## 功能特性
 
-这是一个**桌面应用**，可以：
-- 📁 查看所有 Claude Code 项目列表
-- 📋 浏览每个项目的会话记录
-- 💬 查看完整的对话内容（用户 + AI）
-- 🔄 消息展开/收起功能
+- 查看所有 Claude Code 项目列表
+- 浏览每个项目的会话记录
+- 查看完整的对话内容（用户 + AI）
+- 消息展开/收起功能
 
 ## 为什么做这个
 
-Claude Code 的对话历史存储在本地 `~/.claude/projects/` 目录，但：
-- 无法通过 GitHub Pages 部署（数据在本地）
-- 每次需要启动 Node.js 服务才能访问
-
-所以用 **Tauri** 打包成桌面应用，**无需启动服务**，直接读取本地文件。
+Claude Code 的对话历史存储在本地 `~/.claude/projects/` 目录，但无法通过 GitHub Pages 部署（数据在本地）。使用 **Tauri** 打包成桌面应用，**无需启动服务**，直接读取本地文件。
 
 ## 技术栈
 
@@ -27,43 +22,63 @@ Claude Code 的对话历史存储在本地 `~/.claude/projects/` 目录，但：
 | 语言 | **TypeScript** |
 | 样式 | **Tailwind CSS** |
 
-## 项目结构
+## 目录结构
 
 ```
 claude-history-viewer/
-├── src/
-│   └── app/                    # Next.js 前端
-│       ├── page.tsx            # 首页 - 项目列表
-│       ├── api/                # API 接口
-│       └── projects/           # 页面路由
-├── src-tauri/                  # Tauri 后端 (Rust)
-│   ├── src/lib.rs              # Rust 代码
-│   ├── Cargo.toml              # Rust 依赖
-│   └── tauri.conf.json        # Tauri 配置
-└── package.json                # Node.js 依赖
+├── src/                          # Next.js 前端源码
+│   └── app/                      # App Router 页面
+│       ├── page.tsx              # 首页 - 项目列表
+│       ├── layout.tsx            # 根布局
+│       └── projects/             # 项目页面路由
+│           ├── [slug]/           # 项目详情页
+│           │   └── page.tsx      # 会话列表
+│           └── [slug]/[sessionId]/
+│               └── page.tsx      # 会话消息页
+├── src-tauri/                    # Tauri 后端 (Rust)
+│   ├── src/
+│   │   ├── lib.rs                # Rust 业务逻辑
+│   │   └── main.rs               # 入口文件
+│   ├── Cargo.toml                # Rust 依赖配置
+│   └── tauri.conf.json           # Tauri 应用配置
+├── public/                       # 静态资源
+├── package.json                  # Node.js 依赖
+└── next.config.ts                # Next.js 配置
 ```
 
-## 开发
+### 目录详解
+
+- **`src/app/`** - Next.js 16 App Router 页面目录
+- **`src/app/page.tsx`** - 首页，显示项目列表
+- **`src/app/projects/[slug]/page.tsx`** - 单个项目页面，显示会话列表
+- **`src/app/projects/[slug]/[sessionId]/page.tsx`** - 会话详情页面，显示对话消息
+- **`src-tauri/src/lib.rs`** - Tauri 后端核心逻辑，提供文件读取 API
+- **`src-tauri/tauri.conf.json`** - Tauri 窗口、构建等配置
+
+## 快速开始
+
+### 安装依赖
 
 ```bash
-# 1. 安装依赖
 npm install
-
-# 2. 启动开发模式（同时运行 Next.js + Tauri）
-npm run tauri dev
 ```
 
-首次运行会编译 Rust 依赖，需要几分钟。
+### 开发模式
 
-## 打包
+```bash
+npm run tauri:dev
+```
+
+这会同时启动 Next.js 开发服务器和 Tauri 桌面应用窗口。
+
+### 打包发布
 
 ```bash
 # 打包成 macOS 应用
-npm run tauri build
-
-# 打包成 Windows .exe
-npm run tauri build -- --target x86_64-pc-windows-msvc
+npm run tauri:build
 ```
+
+打包完成后，应用会生成在 `src-tauri/target/release/bundle/` 目录下。
 
 ## 数据来源
 
