@@ -192,11 +192,19 @@ fn get_session_previews(project_id: String) -> Result<Vec<SessionPreview>, Strin
                     lines.push(line.clone());
                     message_count += 1;
 
-                    // 尝试解析获取第一条用户消息作为预览
+                    // 尝试解析获取第一条消息的时间戳
                     if let Ok(data) = serde_json::from_str::<serde_json::Value>(&line) {
                         if last_modified.is_empty() {
-                            if let Some(ts) = data.get("timestamp").and_then(|v| v.as_str()) {
-                                last_modified = ts.to_string();
+                            // 支持秒级时间戳数字或字符串
+                            if let Some(ts) = data.get("timestamp") {
+                                if let Some(ts_str) = ts.as_str() {
+                                    // 如果是数字字符串，转换为 i64
+                                    if let Ok(ts_num) = ts_str.parse::<i64>() {
+                                        last_modified = ts_num.to_string();
+                                    }
+                                } else if let Some(ts_num) = ts.as_i64() {
+                                    last_modified = ts_num.to_string();
+                                }
                             }
                         }
                     }

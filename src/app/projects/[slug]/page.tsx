@@ -13,13 +13,13 @@ interface SessionPreview {
 }
 
 function SessionCard({ session, slug }: { session: SessionPreview; slug: string }) {
-  // 解析时间戳 - 支持秒级时间戳或毫秒级时间戳
+  // 解析时间戳 - 统一按秒级时间戳处理
   let date: Date | null = null
   if (session.last_modified) {
     const timestamp = parseInt(session.last_modified, 10)
     if (!isNaN(timestamp)) {
-      // 如果时间戳小于 10000000000，认为是秒级，转换为毫秒
-      date = new Date(timestamp < 10000000000 ? timestamp * 1000 : timestamp)
+      // Claude Code 使用秒级时间戳
+      date = new Date(timestamp * 1000)
     }
   }
 
