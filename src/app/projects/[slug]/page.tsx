@@ -50,7 +50,7 @@ function SessionCard({ session, slug }: { session: SessionPreview; slug: string 
             <p className="text-sm text-gray-400 italic">暂无预览</p>
           )}
         </div>
-        {isValidDate && (
+        {isValidDate && date && (
           <div className="text-right flex-shrink-0">
             <p className="text-xs text-gray-500">
               {date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}
