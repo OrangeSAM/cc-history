@@ -63,6 +63,16 @@ claude-history-viewer/
 npm install
 ```
 
+### 命令说明
+
+| 命令 | 说明 |
+|------|------|
+| `npm run tauri:dev` | 开发模式，启动桌面应用窗口 |
+| `npm run tauri:build` | 打包成 macOS 应用 |
+| `npm run lint` | 运行 ESLint 检查代码 |
+
+> **注意**：由于前端依赖 Tauri 后端的 IPC API，单独运行前端 (`npm run dev`) 没有意义，必须通过 Tauri 命令启动。
+
 ### 开发模式
 
 ```bash
@@ -74,7 +84,6 @@ npm run tauri:dev
 ### 打包发布
 
 ```bash
-# 打包成 macOS 应用
 npm run tauri:build
 ```
 
