@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
+use std::io::BufRead;
+use std::io::BufReader;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Project {
@@ -142,11 +144,123 @@ fn get_messages(session_path: String) -> Result<String, String> {
     fs::read_to_string(&session_path).map_err(|e| e.to_string())
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SessionPreview {
+    pub id: String,
+    pub preview: String,
+    pub message_count: usize,
+    pub last_modified: String,
+}
+
+#[tauri::command]
+fn get_session_previews(project_id: String) -> Result<Vec<SessionPreview>, String> {
+    let home = dirs::home_dir().ok_or("Cannot find home directory")?;
+    let project_path = home.join(".claude/projects").join(&project_id);
+
+    if !project_path.exists() {
+        return Err("Project not found".to_string());
+    }
+
+    let mut previews: Vec<SessionPreview> = vec![];
+
+    if let Ok(entries) = fs::read_dir(&project_path) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let filename = path.file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("");
+
+            if !filename.ends_with(".jsonl") {
+                continue;
+            }
+
+            let id = filename.replace(".jsonl", "");
+
+            // 读取文件获取预览
+            let file = match fs::File::open(&path) {
+                Ok(f) => f,
+                Err(_) => continue,
+            };
+            let reader = BufReader::new(file);
+
+            let mut lines: Vec<String> = vec![];
+            let mut message_count = 0;
+            let mut last_modified = String::new();
+
+            for line in reader.lines().take(20) {
+                if let Ok(line) = line {
+                    lines.push(line.clone());
+                    message_count += 1;
+
+                    // 尝试解析获取第一条用户消息作为预览
+                    if let Ok(data) = serde_json::from_str::<serde_json::Value>(&line) {
+                        if last_modified.is_empty() {
+                            if let Some(ts) = data.get("timestamp").and_then(|v| v.as_str()) {
+                                last_modified = ts.to_string();
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 从消息中提取预览文本
+            let mut preview = String::new();
+            for line in &lines {
+                if let Ok(data) = serde_json::from_str::<serde_json::Value>(line) {
+                    let msg_type = data.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                    if msg_type == "user" {
+                        if let Some(content) = data.get("message").and_then(|m| m.get("content")) {
+                            if let Some(text) = content.as_str() {
+                                preview = text.chars().take(100).collect();
+                                if text.len() > 100 {
+                                    preview.push_str("...");
+                                }
+                                break;
+                            } else if let Some(arr) = content.as_array() {
+                                if let Some(first) = arr.first() {
+                                    if let Some(text) = first.get("text").and_then(|v| v.as_str()) {
+                                        preview = text.chars().take(100).collect();
+                                        if text.len() > 100 {
+                                            preview.push_str("...");
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 获取文件修改时间
+            if last_modified.is_empty() {
+                if let Ok(metadata) = entry.metadata() {
+                    if let Ok(time) = metadata.modified() {
+                        if let Ok(duration) = time.duration_since(std::time::UNIX_EPOCH) {
+                            last_modified = duration.as_secs().to_string();
+                        }
+                    }
+                }
+            }
+
+            previews.push(SessionPreview {
+                id,
+                preview,
+                message_count,
+                last_modified,
+            });
+        }
+    }
+
+    previews.sort_by(|a, b| b.last_modified.cmp(&a.last_modified));
+    Ok(previews)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
-        .invoke_handler(tauri::generate_handler![get_projects, get_sessions, get_messages])
+        .invoke_handler(tauri::generate_handler![get_projects, get_sessions, get_messages, get_session_previews])
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
