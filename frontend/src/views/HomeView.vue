@@ -39,12 +39,6 @@ function goToProject(project: Project) {
 
 <template>
   <div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-    <header class="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10">
-      <div class="max-w-4xl mx-auto px-6 py-4">
-        <h1 class="text-lg font-semibold text-gray-900">Claude Code 历史</h1>
-      </div>
-    </header>
-
     <main class="max-w-4xl mx-auto px-6 py-8">
       <!-- 统计摘要 -->
       <div v-if="!loading && !error && projects.length > 0" class="mb-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-5 text-white">
