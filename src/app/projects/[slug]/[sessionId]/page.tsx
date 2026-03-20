@@ -191,7 +191,7 @@ export default function SessionPage() {
       <main className="max-w-4xl mx-auto px-4 py-8">
         <div className="space-y-4">
           {messages.map((msg, idx) => (
-            <MessageItem key={msg.id || idx} msg={msg} idx={idx} />
+            <MessageItem key={`${idx}-${msg.type}`} msg={msg} idx={idx} />
           ))}
         </div>
 
