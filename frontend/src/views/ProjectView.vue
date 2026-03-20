@@ -3,6 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { getSessionPreviews } from '../api'
 import type { SessionPreview } from '../types'
+import { useTheme } from '../composables/useTheme'
 
 const props = defineProps<{
   slug: string
@@ -12,6 +13,7 @@ const router = useRouter()
 const sessions = ref<SessionPreview[]>([])
 const loading = ref(true)
 const error = ref('')
+const { theme, toggleTheme } = useTheme()
 
 const projectName = computed(() => {
   return props.slug.replace(/-/g, ' / ').replace(/Users.*Desktop./i, '')
@@ -56,20 +58,35 @@ function goHome() {
       style="background: var(--bg-secondary); border-color: var(--border-color);"
     >
       <div class="max-w-4xl mx-auto px-6 py-4">
-        <div class="flex items-center gap-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-4">
+            <button
+              @click="goHome"
+              class="p-2 rounded-lg transition-colors hover:bg-white/5"
+              style="color: var(--text-secondary);"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+              </svg>
+            </button>
+            <div>
+              <h1 class="text-base font-medium" style="color: var(--text-primary);">{{ projectName }}</h1>
+              <p class="text-xs" style="color: var(--text-muted);">{{ sessions.length }} sessions</p>
+            </div>
+          </div>
           <button
-            @click="goHome"
-            class="p-2 rounded-lg transition-colors hover:bg-white/5"
-            style="color: var(--text-secondary);"
+            @click="toggleTheme"
+            class="p-2 rounded-lg border transition-all duration-200"
+            style="background: var(--bg-card); border-color: var(--border-color); color: var(--text-secondary);"
+            :title="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
           >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+            <svg v-if="theme === 'dark'" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+            <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
             </svg>
           </button>
-          <div>
-            <h1 class="text-base font-medium" style="color: var(--text-primary);">{{ projectName }}</h1>
-            <p class="text-xs" style="color: var(--text-muted);">{{ sessions.length }} sessions</p>
-          </div>
         </div>
       </div>
     </header>

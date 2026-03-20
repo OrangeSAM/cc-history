@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
-:root {
+/* 暗色主题（默认） */
+:root, [data-theme="dark"] {
   --bg-primary: #0a0a0a;
   --bg-secondary: #141414;
   --bg-card: #1a1a1a;
@@ -12,7 +13,23 @@
   --text-muted: #555555;
   --accent: #f5a623;
   --accent-glow: rgba(245, 166, 35, 0.15);
-  --accent-subtle: #f5a62326;
+  --accent-subtle: rgba(245, 166, 35, 0.15);
+}
+
+/* 亮色主题 */
+[data-theme="light"] {
+  --bg-primary: #f8f9fa;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f0f0f0;
+  --border-color: #e5e5e5;
+  --border-hover: #d4d4d4;
+  --text-primary: #1a1a1a;
+  --text-secondary: #525252;
+  --text-muted: #a3a3a3;
+  --accent: #d97706;
+  --accent-glow: rgba(217, 119, 6, 0.1);
+  --accent-subtle: rgba(217, 119, 6, 0.1);
 }
 
 * {
@@ -26,6 +43,7 @@ body {
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* 自定义滚动条 */
@@ -47,12 +65,12 @@ body {
   background: var(--text-muted);
 }
 
-/* 扫描线效果 */
-.scanlines {
+/* 扫描线效果 - 仅暗色主题 */
+[data-theme="dark"] .scanlines {
   position: relative;
 }
 
-.scanlines::before {
+[data-theme="dark"] .scanlines::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -72,14 +90,25 @@ body {
   transition: all 0.2s ease;
 }
 
-.card-glow:hover {
+[data-theme="dark"] .card-glow:hover {
   background-color: var(--bg-card-hover);
   border-color: var(--border-hover);
   box-shadow: 0 0 20px var(--accent-glow);
 }
 
-/* 文字发光 */
-.text-glow {
+[data-theme="light"] .card-glow:hover {
+  background-color: var(--bg-card-hover);
+  border-color: var(--border-hover);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 亮色主题下的按钮hover效果 */
+[data-theme="light"] .hover\:bg-white\/5:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+/* 文字发光 - 仅暗色主题 */
+[data-theme="dark"] .text-glow {
   text-shadow: 0 0 10px var(--accent-glow);
 }
 
@@ -97,9 +126,14 @@ body {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-/* 渐变背景 */
-.bg-terminal {
+/* 暗色主题背景 */
+[data-theme="dark"] .bg-terminal {
   background: linear-gradient(135deg, var(--bg-primary) 0%, #0d0d0d 50%, var(--bg-primary) 100%);
+}
+
+/* 亮色主题背景 */
+[data-theme="light"] .bg-terminal {
+  background: linear-gradient(135deg, var(--bg-primary) 0%, #ffffff 50%, var(--bg-primary) 100%);
 }
 
 #app {
