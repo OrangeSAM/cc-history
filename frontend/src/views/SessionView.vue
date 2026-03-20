@@ -149,33 +149,41 @@ function getTextContent(content: string): string {
   return text
 }
 
-
 async function copyCode(code: string) {
   await navigator.clipboard.writeText(code.replace(/```\w*\n?/g, '').trim())
 }
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-    <header class="bg-white/80 backdrop-blur-sm border-b border-gray-200 sticky top-0 z-10">
+  <div class="min-h-screen bg-terminal scanlines">
+    <header
+      class="sticky top-0 z-10 border-b"
+      style="background: var(--bg-secondary); border-color: var(--border-color);"
+    >
       <div class="max-w-4xl mx-auto px-6 py-4">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-4">
-            <button @click="goBack" class="p-2 rounded-lg hover:bg-gray-100">
-              <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <button
+              @click="goBack"
+              class="p-2 rounded-lg transition-colors hover:bg-white/5"
+              style="color: var(--text-secondary);"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
               </svg>
             </button>
             <div>
-              <h1 class="text-lg font-semibold text-gray-900">{{ sessionId?.slice(0, 8) }}...</h1>
-              <p class="text-xs text-gray-500">{{ messages.length }} 条消息</p>
+              <h1 class="text-base font-medium" style="color: var(--text-primary);">
+                {{ sessionId?.slice(0, 8) }}...
+              </h1>
+              <p class="text-xs" style="color: var(--text-muted);">{{ messages.length }} messages</p>
             </div>
           </div>
           <div class="flex items-center gap-2">
             <button
               @click="showOutline = !showOutline"
               class="p-2 rounded-lg transition-colors"
-              :class="showOutline ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-600'"
+              :style="showOutline ? { background: 'var(--accent-subtle)', color: 'var(--accent)' } : { color: 'var(--text-secondary)' }"
               title="显示/隐藏大纲"
             >
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -185,11 +193,12 @@ async function copyCode(code: string) {
             <button
               @click="handleRefresh"
               :disabled="refreshing"
-              class="p-2 rounded-lg hover:bg-gray-100 disabled:opacity-50"
+              class="p-2 rounded-lg transition-colors hover:bg-white/5 disabled:opacity-50"
+              style="color: var(--text-secondary);"
               title="刷新"
             >
               <svg
-                class="w-5 h-5 text-gray-600"
+                class="w-5 h-5"
                 :class="{ 'animate-spin': refreshing }"
                 fill="none"
                 stroke="currentColor"
@@ -205,25 +214,30 @@ async function copyCode(code: string) {
 
     <div class="flex">
       <!-- 大纲面板 -->
-      <aside v-if="showOutline && userOutlines.length > 0" class="w-64 flex-shrink-0 bg-white border-r border-gray-200 hidden md:block">
+      <aside
+        v-if="showOutline && userOutlines.length > 0"
+        class="w-64 flex-shrink-0 hidden md:block border-r"
+        style="background: var(--bg-secondary); border-color: var(--border-color);"
+      >
         <div class="sticky top-[65px] p-4 max-h-[calc(100vh-65px)] overflow-y-auto">
-          <h2 class="text-sm font-semibold text-gray-700 mb-3">
-            消息大纲 <span class="text-gray-400 font-normal">({{ userOutlines.length }})</span>
+          <h2 class="text-sm font-medium mb-3" style="color: var(--text-secondary);">
+            Outline <span class="font-normal" style="color: var(--text-muted);">({{ userOutlines.length }})</span>
           </h2>
           <div class="space-y-2">
             <button
               v-for="(outline, idx) in userOutlines"
               :key="idx"
               @click="scrollToMessage(outline.index)"
-              class="w-full text-left p-2 rounded-lg hover:bg-blue-50 transition-colors group"
+              class="w-full text-left p-2 rounded-lg transition-colors group"
+              style="background: var(--bg-card); border: 1px solid var(--border-color);"
             >
               <div class="flex items-center gap-2 mb-1">
-                <span class="text-xs font-medium text-blue-600">#{{ idx + 1 }}</span>
-                <span v-if="outline.timestamp" class="text-xs text-gray-400">
+                <span class="text-xs font-medium" style="color: var(--accent);">#{{ idx + 1 }}</span>
+                <span v-if="outline.timestamp" class="text-xs" style="color: var(--text-muted);">
                   {{ formatDate(outline.timestamp) }}
                 </span>
               </div>
-              <p class="text-xs text-gray-600 line-clamp-2 group-hover:text-gray-800">
+              <p class="text-xs line-clamp-2" style="color: var(--text-secondary);">
                 {{ outline.preview }}
               </p>
             </button>
@@ -237,22 +251,29 @@ async function copyCode(code: string) {
           <!-- 加载状态 -->
           <div v-if="loading" class="space-y-6">
             <div v-for="i in 5" :key="i" class="ml-8">
-              <div class="bg-white rounded-xl border border-gray-200 p-4 animate-pulse">
+              <div
+                class="rounded-xl border p-4 animate-pulse"
+                style="background: var(--bg-card); border-color: var(--border-color);"
+              >
                 <div class="flex items-center gap-2 mb-3">
-                  <div class="h-3 w-16 bg-gray-200 rounded"></div>
-                  <div class="h-3 w-24 bg-gray-100 rounded"></div>
+                  <div class="h-3 w-16 rounded" style="background: var(--bg-secondary);"></div>
+                  <div class="h-3 w-24 rounded" style="background: var(--bg-secondary);"></div>
                 </div>
                 <div class="space-y-2">
-                  <div class="h-4 w-full bg-gray-100 rounded"></div>
-                  <div class="h-4 w-3/4 bg-gray-100 rounded"></div>
-                  <div class="h-4 w-1/2 bg-gray-100 rounded"></div>
+                  <div class="h-4 w-full rounded" style="background: var(--bg-secondary);"></div>
+                  <div class="h-4 w-3/4 rounded" style="background: var(--bg-secondary);"></div>
+                  <div class="h-4 w-1/2 rounded" style="background: var(--bg-secondary);"></div>
                 </div>
               </div>
             </div>
           </div>
 
           <!-- 错误状态 -->
-          <div v-else-if="error" class="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
+          <div
+            v-else-if="error"
+            class="p-4 rounded-lg border"
+            style="background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); color: #ef4444;"
+          >
             {{ error }}
           </div>
 
@@ -265,40 +286,42 @@ async function copyCode(code: string) {
               class="relative"
             >
               <!-- 时间轴线 -->
-              <div v-if="idx > 0" class="absolute left-5 top-0 bottom-[-1rem] w-px bg-gray-200"></div>
+              <div
+                v-if="idx > 0"
+                class="absolute left-5 top-0 bottom-[-1rem] w-px"
+                style="background: var(--border-color);"
+              ></div>
 
               <!-- 时间轴点 -->
               <div
-                class="absolute left-4 w-3 h-3 rounded-full border-2 border-white shadow-sm z-10"
-                :class="{
-                  'bg-blue-500': msg.type === 'user',
-                  'bg-green-500': msg.type === 'assistant',
-                  'bg-gray-400': msg.type === 'snapshot'
+                class="absolute left-4 w-3 h-3 rounded-full border-2 z-10"
+                style="border-color: var(--bg-primary);"
+                :style="{
+                  background: msg.type === 'user' ? 'var(--accent)' :
+                             msg.type === 'assistant' ? '#4ade80' : 'var(--text-muted)'
                 }"
               ></div>
 
               <div
-                class="ml-8 rounded-xl p-4"
-                :class="{
-                  'bg-blue-50 border border-blue-100': msg.type === 'user',
-                  'bg-white border border-gray-200 shadow-sm': msg.type === 'assistant',
-                  'bg-gray-100 border border-gray-200': msg.type === 'snapshot'
+                class="ml-8 rounded-xl p-4 border"
+                :style="{
+                  background: msg.type === 'user' ? 'var(--bg-card)' : 'var(--bg-secondary)',
+                  borderColor: msg.type === 'user' ? 'var(--accent-subtle)' : 'var(--border-color)'
                 }"
               >
                 <!-- 消息头 -->
                 <div class="flex items-center justify-between mb-3">
                   <div class="flex items-center gap-2">
                     <span
-                      class="text-xs font-semibold"
-                      :class="{
-                        'text-blue-600': msg.type === 'user',
-                        'text-green-600': msg.type === 'assistant',
-                        'text-gray-500': msg.type === 'snapshot'
+                      class="text-xs font-medium"
+                      :style="{
+                        color: msg.type === 'user' ? 'var(--accent)' :
+                               msg.type === 'assistant' ? '#4ade80' : 'var(--text-muted)'
                       }"
                     >
-                      {{ msg.type === 'user' ? '👤 你' : msg.type === 'assistant' ? '🤖 Claude' : '📁 快照' }}
+                      {{ msg.type === 'user' ? 'You' : msg.type === 'assistant' ? 'Claude' : 'Snapshot' }}
                     </span>
-                    <span v-if="msg.timestamp" class="text-xs text-gray-400">
+                    <span v-if="msg.timestamp" class="text-xs" style="color: var(--text-muted);">
                       {{ formatDate(msg.timestamp) }}
                     </span>
                   </div>
@@ -313,23 +336,34 @@ async function copyCode(code: string) {
                   >
                     <button
                       @click="copyCode(block)"
-                      class="absolute top-2 right-2 px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-600"
+                      class="absolute top-2 right-2 px-2 py-1 text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                      style="background: rgba(255,255,255,0.1); color: var(--text-secondary);"
                     >
-                      复制
+                      Copy
                     </button>
-                    <pre class="bg-gray-900 text-gray-100 rounded-lg p-4 overflow-x-auto text-sm font-mono"><code>{{ block.replace(/```\w*\n?/g, '').trim() }}</code></pre>
+                    <pre
+                      class="rounded-lg p-4 overflow-x-auto text-sm"
+                      style="background: #0d0d0d; color: var(--text-primary); font-family: 'SF Mono', monospace;"
+                    ><code>{{ block.replace(/```\w*\n?/g, '').trim() }}</code></pre>
                   </div>
                 </div>
 
                 <!-- 文本内容 -->
-                <div class="text-gray-800 whitespace-pre-wrap break-words">
-                  {{ getTextContent(msg.content) || '(无内容)' }}
+                <div
+                  class="whitespace-pre-wrap break-words"
+                  style="color: var(--text-secondary);"
+                >
+                  {{ getTextContent(msg.content) || '(empty)' }}
                 </div>
               </div>
             </div>
 
-            <div v-if="messages.length === 0" class="text-center py-12 text-gray-500">
-              暂无消息
+            <div
+              v-if="messages.length === 0"
+              class="text-center py-12"
+              style="color: var(--text-muted);"
+            >
+              No messages
             </div>
           </template>
         </div>
@@ -337,3 +371,12 @@ async function copyCode(code: string) {
     </div>
   </div>
 </template>
+
+<style scoped>
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+</style>

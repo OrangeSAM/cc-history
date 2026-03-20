@@ -35,67 +35,116 @@ function formatDate(timestamp: string): string {
 function goToProject(project: Project) {
   router.push({ name: 'project', params: { slug: project.id } })
 }
+
+// 生成项目首字母的颜色
+function getProjectColor(name: string): string {
+  const colors = [
+    '#f5a623', // amber
+    '#4ade80', // green
+    '#60a5fa', // blue
+    '#f472b6', // pink
+    '#a78bfa', // violet
+    '#fbbf24', // yellow
+    '#34d399', // emerald
+    '#2dd4bf', // teal
+  ]
+  const index = name.charCodeAt(0) % colors.length
+  return colors[index]
+}
 </script>
 
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
-    <main class="max-w-4xl mx-auto px-6 py-8">
+  <div class="min-h-screen bg-terminal scanlines">
+    <main class="max-w-4xl mx-auto px-6 py-10">
+      <!-- 标题区 -->
+      <div class="mb-8">
+        <h1 class="text-2xl font-bold text-glow" style="color: var(--accent);">
+          Claude History
+        </h1>
+        <p class="text-sm mt-1" style="color: var(--text-muted);">
+          // {{ stats.projectCount }} projects, {{ stats.sessionCount }} sessions
+        </p>
+      </div>
+
       <!-- 统计摘要 -->
-      <div v-if="!loading && !error && projects.length > 0" class="mb-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-5 text-white">
+      <div
+        v-if="!loading && !error && projects.length > 0"
+        class="mb-8 p-5 rounded-xl border"
+        style="background: var(--bg-card); border-color: var(--border-color);"
+      >
         <div class="flex items-center justify-between">
           <div>
-            <p class="text-sm opacity-80">项目数量</p>
-            <p class="text-3xl font-bold">{{ stats.projectCount }}</p>
+            <p class="text-xs" style="color: var(--text-muted);">PROJECTS</p>
+            <p class="text-3xl font-bold text-glow" style="color: var(--accent);">{{ stats.projectCount }}</p>
           </div>
           <div class="text-right">
-            <p class="text-sm opacity-80">总会话数</p>
-            <p class="text-3xl font-bold">{{ stats.sessionCount }}</p>
+            <p class="text-xs" style="color: var(--text-muted);">SESSIONS</p>
+            <p class="text-3xl font-bold text-glow" style="color: var(--accent);">{{ stats.sessionCount }}</p>
           </div>
         </div>
       </div>
 
-      <div v-if="loading" class="space-y-4">
-        <div v-for="i in 5" :key="i" class="bg-white rounded-xl border border-gray-200 p-5 animate-pulse">
+      <!-- 加载状态 -->
+      <div v-if="loading" class="space-y-3">
+        <div
+          v-for="i in 5"
+          :key="i"
+          class="rounded-lg border p-4 animate-pulse"
+          style="background: var(--bg-card); border-color: var(--border-color);"
+        >
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg bg-gray-200"></div>
+            <div class="w-9 h-9 rounded" style="background: var(--bg-secondary);"></div>
             <div class="flex-1">
-              <div class="h-4 w-32 bg-gray-200 rounded mb-2"></div>
-              <div class="h-3 w-24 bg-gray-100 rounded"></div>
+              <div class="h-4 w-32 rounded mb-2" style="background: var(--bg-secondary);"></div>
+              <div class="h-3 w-20 rounded" style="background: var(--bg-secondary);"></div>
             </div>
           </div>
         </div>
       </div>
 
-      <div v-else-if="error" class="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600">
+      <!-- 错误状态 -->
+      <div
+        v-else-if="error"
+        class="p-4 rounded-lg border"
+        style="background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.3); color: #ef4444;"
+      >
         {{ error }}
       </div>
 
-      <!-- 响应式项目列表 -->
-      <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <!-- 项目列表 -->
+      <div v-else class="space-y-3">
         <div
           v-for="project in projects"
           :key="project.id"
           @click="goToProject(project)"
-          class="group bg-white rounded-xl border border-gray-200 p-5 hover:border-blue-300 hover:shadow-lg hover:shadow-blue-100/50 transition-all duration-200 cursor-pointer"
+          class="card-glow rounded-lg border p-4 cursor-pointer"
+          style="background: var(--bg-card); border-color: var(--border-color);"
         >
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-3 min-w-0">
-              <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm shadow-md flex-shrink-0">
+              <div
+                class="w-9 h-9 rounded flex items-center justify-center text-sm font-bold shadow-lg"
+                :style="{ backgroundColor: getProjectColor(project.name), color: '#000' }"
+              >
                 {{ project.name.charAt(0).toUpperCase() }}
               </div>
               <div class="min-w-0">
-                <h2 class="font-medium text-gray-900 truncate">{{ project.name }}</h2>
-                <p class="text-xs text-gray-500">{{ project.session_count }} 个会话</p>
+                <h2 class="font-medium truncate" style="color: var(--text-primary);">{{ project.name }}</h2>
+                <p class="text-xs" style="color: var(--text-muted);">{{ project.session_count }} sessions</p>
               </div>
             </div>
-            <div class="text-right flex-shrink-0 ml-2">
-              <p class="text-xs text-gray-500">{{ formatDate(project.last_modified) }}</p>
+            <div class="text-right flex-shrink-0 ml-3">
+              <p class="text-xs" style="color: var(--text-muted);">{{ formatDate(project.last_modified) }}</p>
             </div>
           </div>
         </div>
 
-        <div v-if="projects.length === 0" class="col-span-full text-center py-12 text-gray-500">
-          暂无项目
+        <div
+          v-if="projects.length === 0"
+          class="text-center py-12"
+          style="color: var(--text-muted);"
+        >
+          No projects found
         </div>
       </div>
     </main>
