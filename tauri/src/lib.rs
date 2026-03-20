@@ -183,14 +183,22 @@ fn get_session_previews(project_id: String) -> Result<Vec<SessionPreview>, Strin
             };
             let reader = BufReader::new(file);
 
+            // 先统计总行数（消息数量）
+            let message_count = reader.lines().count();
+
+            // 重新打开文件获取预览
+            let file = match fs::File::open(&path) {
+                Ok(f) => f,
+                Err(_) => continue,
+            };
+            let reader = BufReader::new(file);
+
             let mut lines: Vec<String> = vec![];
-            let mut message_count = 0;
             let mut last_modified = String::new();
 
             for line in reader.lines().take(20) {
                 if let Ok(line) = line {
                     lines.push(line.clone());
-                    message_count += 1;
 
                     // 尝试解析获取第一条消息的时间戳
                     if let Ok(data) = serde_json::from_str::<serde_json::Value>(&line) {
