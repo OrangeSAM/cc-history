@@ -19,7 +19,7 @@ function ProjectCard({ project }: { project: Project }) {
 
   return (
     <Link
-      href={`/projects/${project.id}`}
+      href={`/projects/view?project=${project.id}`}
       className="group bg-white rounded-xl border border-gray-200 p-5 hover:border-blue-300 hover:shadow-lg hover:shadow-blue-100/50 transition-all duration-200"
     >
       <div className="flex items-start justify-between">
