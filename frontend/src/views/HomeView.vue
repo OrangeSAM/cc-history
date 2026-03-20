@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getProjects } from '../api'
 import type { Project } from '../types'
@@ -8,6 +8,12 @@ const router = useRouter()
 const projects = ref<Project[]>([])
 const loading = ref(true)
 const error = ref('')
+
+const stats = computed(() => {
+  const projectCount = projects.value.length
+  const sessionCount = projects.value.reduce((sum, p) => sum + p.session_count, 0)
+  return { projectCount, sessionCount }
+})
 
 onMounted(async () => {
   try {
@@ -40,6 +46,20 @@ function goToProject(project: Project) {
     </header>
 
     <main class="max-w-4xl mx-auto px-6 py-8">
+      <!-- 统计摘要 -->
+      <div v-if="!loading && !error && projects.length > 0" class="mb-6 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl p-5 text-white">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="text-sm opacity-80">项目数量</p>
+            <p class="text-3xl font-bold">{{ stats.projectCount }}</p>
+          </div>
+          <div class="text-right">
+            <p class="text-sm opacity-80">总会话数</p>
+            <p class="text-3xl font-bold">{{ stats.sessionCount }}</p>
+          </div>
+        </div>
+      </div>
+
       <div v-if="loading" class="space-y-4">
         <div v-for="i in 5" :key="i" class="bg-white rounded-xl border border-gray-200 p-5 animate-pulse">
           <div class="flex items-center gap-3">
@@ -56,7 +76,8 @@ function goToProject(project: Project) {
         {{ error }}
       </div>
 
-      <div v-else class="space-y-4">
+      <!-- 响应式项目列表 -->
+      <div v-else class="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div
           v-for="project in projects"
           :key="project.id"
@@ -64,22 +85,22 @@ function goToProject(project: Project) {
           class="group bg-white rounded-xl border border-gray-200 p-5 hover:border-blue-300 hover:shadow-lg hover:shadow-blue-100/50 transition-all duration-200 cursor-pointer"
         >
           <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm shadow-md">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-semibold text-sm shadow-md flex-shrink-0">
                 {{ project.name.charAt(0).toUpperCase() }}
               </div>
-              <div>
-                <h2 class="font-medium text-gray-900">{{ project.name }}</h2>
+              <div class="min-w-0">
+                <h2 class="font-medium text-gray-900 truncate">{{ project.name }}</h2>
                 <p class="text-xs text-gray-500">{{ project.session_count }} 个会话</p>
               </div>
             </div>
-            <div class="text-right">
+            <div class="text-right flex-shrink-0 ml-2">
               <p class="text-xs text-gray-500">{{ formatDate(project.last_modified) }}</p>
             </div>
           </div>
         </div>
 
-        <div v-if="projects.length === 0" class="text-center py-12 text-gray-500">
+        <div v-if="projects.length === 0" class="col-span-full text-center py-12 text-gray-500">
           暂无项目
         </div>
       </div>
