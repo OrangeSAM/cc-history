@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { invoke } from '@tauri-apps/api/core'
@@ -9,6 +9,12 @@ interface Message {
   id: string
   type: 'user' | 'assistant' | 'snapshot'
   content: string
+  timestamp: string
+}
+
+interface UserMessageOutline {
+  index: number
+  preview: string
   timestamp: string
 }
 
@@ -38,7 +44,7 @@ function CodeBlock({ code }: { code: string }) {
   )
 }
 
-function MessageItem({ msg, idx }: { msg: Message; idx: number }) {
+function MessageItem({ msg, idx, messageRefs }: { msg: Message; idx: number; messageRefs: React.RefObject<(HTMLDivElement | null)[]> }) {
   const [expanded, setExpanded] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -69,7 +75,10 @@ function MessageItem({ msg, idx }: { msg: Message; idx: number }) {
   const date = msg.timestamp ? new Date(msg.timestamp) : null
 
   return (
-    <div className="relative">
+    <div
+      ref={(el) => { messageRefs.current[idx] = el }}
+      className="relative"
+    >
       {/* 时间轴线 */}
       {idx > 0 && (
         <div className="absolute left-5 top-0 bottom-[-1rem] w-px bg-gray-200"></div>
@@ -175,14 +184,23 @@ function parseMessages(content: string): Message[] {
         if (typeof content === 'string') {
           text = content
         } else if (Array.isArray(content)) {
-          text = content.map((c: any) => c.text || c.content || '').join('')
+          // 过滤掉 tool_result，只保留文本内容
+          const textParts = content
+            .filter((c: any) => c.type !== 'tool_result')
+            .map((c: any) => c.text || c.content || '')
+            .join('')
+          text = textParts
         }
-        messages.push({
-          id: data.uuid || data.messageId || '',
-          type: 'user',
-          content: text,
-          timestamp: data.timestamp || ''
-        })
+
+        // 只添加有实际文本内容的用户消息
+        if (text.trim()) {
+          messages.push({
+            id: data.uuid || data.messageId || '',
+            type: 'user',
+            content: text,
+            timestamp: data.timestamp || ''
+          })
+        }
       } else if (type === 'assistant') {
         const content = data.message?.content
         let text = ''
@@ -208,6 +226,21 @@ function parseMessages(content: string): Message[] {
   }
 
   return messages
+}
+
+function getUserMessageOutlines(messages: Message[]): UserMessageOutline[] {
+  return messages
+    .filter(msg => msg.type === 'user')
+    .map((msg) => {
+      const preview = msg.content.length > 50
+        ? msg.content.slice(0, 50) + '...'
+        : msg.content || '(无内容)'
+      return {
+        index: messages.indexOf(msg),
+        preview,
+        timestamp: msg.timestamp
+      }
+    })
 }
 
 function Skeleton() {
@@ -240,6 +273,17 @@ export default function SessionPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
+  const [showOutline, setShowOutline] = useState(true)
+  const messageRefs = React.useRef<(HTMLDivElement | null)[]>([])
+
+  const userOutlines = getUserMessageOutlines(messages)
+
+  const scrollToMessage = (index: number) => {
+    const element = messageRefs.current[index]
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }
 
   const loadMessages = async () => {
     try {
@@ -336,38 +380,89 @@ export default function SessionPage() {
                 <p className="text-xs text-gray-500">{messages.length} 条消息</p>
               </div>
             </div>
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
-              title="刷新"
-            >
-              <svg
-                className={`w-5 h-5 text-gray-600 ${refreshing ? 'animate-spin' : ''}`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowOutline(!showOutline)}
+                className={`p-2 rounded-lg transition-colors ${
+                  showOutline ? 'bg-blue-100 text-blue-600' : 'hover:bg-gray-100 text-gray-600'
+                }`}
+                title={showOutline ? '隐藏大纲' : '显示大纲'}
               >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+                title="刷新"
+              >
+                <svg
+                  className={`w-5 h-5 text-gray-600 ${refreshing ? 'animate-spin' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-6 py-8">
-        <div className="space-y-6">
-          {messages.map((msg, idx) => (
-            <MessageItem key={`${idx}-${msg.type}`} msg={msg} idx={idx} />
-          ))}
-        </div>
-
-        {messages.length === 0 && (
-          <div className="text-center py-12 text-gray-500">
-            暂无消息
-          </div>
+      <div className="flex">
+        {/* 大纲面板 */}
+        {showOutline && userOutlines.length > 0 && (
+          <aside className="w-64 flex-shrink-0 bg-white border-r border-gray-200 hidden md:block">
+            <div className="sticky top-[65px] p-4 max-h-[calc(100vh-65px)] overflow-y-auto">
+              <h2 className="text-sm font-semibold text-gray-700 mb-3">
+                消息大纲 <span className="text-gray-400 font-normal">({userOutlines.length})</span>
+              </h2>
+              <div className="space-y-2">
+                {userOutlines.map((outline, idx) => {
+                  const date = outline.timestamp ? new Date(outline.timestamp) : null
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => scrollToMessage(outline.index)}
+                      className="w-full text-left p-2 rounded-lg hover:bg-blue-50 transition-colors group"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs font-medium text-blue-600">#{idx + 1}</span>
+                        {date && (
+                          <span className="text-xs text-gray-400">
+                            {date.toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-600 line-clamp-2 group-hover:text-gray-800">
+                        {outline.preview}
+                      </p>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </aside>
         )}
-      </main>
+
+        {/* 消息列表 */}
+        <main className={`flex-1 px-6 py-8 ${showOutline ? 'md:pl-0' : ''}`}>
+          <div className={`${showOutline ? 'max-w-3xl' : 'max-w-4xl'} mx-auto space-y-6`}>
+            {messages.map((msg, idx) => (
+              <MessageItem key={`${idx}-${msg.type}`} msg={msg} idx={idx} messageRefs={messageRefs} />
+            ))}
+          </div>
+
+          {messages.length === 0 && (
+            <div className="text-center py-12 text-gray-500">
+              暂无消息
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   )
 }
