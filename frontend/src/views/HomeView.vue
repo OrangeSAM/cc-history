@@ -64,9 +64,6 @@ function getProjectColor(name: string): string {
           <h1 class="text-2xl font-bold text-glow" style="color: var(--accent);">
             Claude History
           </h1>
-          <p class="text-sm mt-1" style="color: var(--text-muted);">
-            // {{ stats.projectCount }} projects, {{ stats.sessionCount }} sessions
-          </p>
         </div>
         <!-- 主题切换按钮 -->
         <button
