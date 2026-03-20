@@ -4,10 +4,8 @@
   "version": "0.1.0",
   "identifier": "com.cchistory.desktop",
   "build": {
-    "frontendDist": "../out",
-    "devUrl": "http://localhost:3000",
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "frontendDist": "../frontend/dist",
+    "devUrl": "http://localhost:5173"
   },
   "app": {
     "windows": [

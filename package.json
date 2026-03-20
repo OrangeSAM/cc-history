@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "tauri:build": "npm run build:frontend && tauri build",
+    "build:frontend": "npm run build --prefix frontend"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.10.1",
