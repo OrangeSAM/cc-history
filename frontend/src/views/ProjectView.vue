@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { getSessionPreviews } from '../api'
+import { getSessionPreviews, getProjects } from '../api'
 import type { SessionPreview } from '../types'
 import { useTheme } from '../composables/useTheme'
 
@@ -13,15 +13,18 @@ const router = useRouter()
 const sessions = ref<SessionPreview[]>([])
 const loading = ref(true)
 const error = ref('')
+const projectName = ref(props.slug)
 const { theme, toggleTheme } = useTheme()
-
-const projectName = computed(() => {
-  return props.slug.replace(/-/g, ' / ').replace(/Users.*Desktop./i, '')
-})
 
 onMounted(async () => {
   try {
-    sessions.value = await getSessionPreviews(props.slug)
+    const [sessionList, projects] = await Promise.all([
+      getSessionPreviews(props.slug),
+      getProjects()
+    ])
+    sessions.value = sessionList
+    const project = projects.find(p => p.id === props.slug)
+    if (project) projectName.value = project.name
   } catch (err) {
     console.error('Error:', err)
     error.value = '加载失败'

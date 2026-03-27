@@ -70,9 +70,21 @@ fn get_projects() -> Result<Vec<Project>, String> {
                     }
                 }
 
-                let display_name = name
-                    .replace("-Users-liuyibi-Desktop-", "")
-                    .replace("-", " / ");
+                // Strip the "-Users-<username>-" prefix (works for any username)
+                let display_name = {
+                    let stripped = if name.starts_with("-Users-") {
+                        // Find the third '-' to get past "-Users-<username>-"
+                        let after_users = &name[7..]; // skip "-Users-"
+                        if let Some(pos) = after_users.find('-') {
+                            &name[7 + pos + 1..] // skip past username segment
+                        } else {
+                            &name[..]
+                        }
+                    } else {
+                        &name[..]
+                    };
+                    stripped.replace("-", " / ")
+                };
 
                 projects.push(Project {
                     id: name,
