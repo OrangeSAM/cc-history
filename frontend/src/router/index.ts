@@ -3,6 +3,7 @@ import HomeView from '../views/HomeView.vue'
 import ProjectView from '../views/ProjectView.vue'
 import SessionView from '../views/SessionView.vue'
 import SearchView from '../views/SearchView.vue'
+import StatsView from '../views/StatsView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -27,6 +28,11 @@ const router = createRouter({
       path: '/search',
       name: 'search',
       component: SearchView
+    },
+    {
+      path: '/stats',
+      name: 'stats',
+      component: StatsView
     }
   ]
 })
