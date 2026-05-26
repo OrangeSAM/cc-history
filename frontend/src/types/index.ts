@@ -94,6 +94,29 @@ export interface ModelUsage {
   output_tokens: number
 }
 
+export interface HermesSession {
+  id: string
+  model: string
+  title: string
+  input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  cache_write_tokens: number
+  estimated_cost_usd: number
+  billing_provider: string
+  message_count: number
+  tool_call_count: number
+  started_at: string
+}
+
+export interface HermesMessage {
+  id: number
+  role: string
+  content: string
+  reasoning: string | null
+  timestamp: string | null
+}
+
 export interface UsageStats {
   daily_usage: DailyUsage[]
   project_usage: ProjectUsage[]

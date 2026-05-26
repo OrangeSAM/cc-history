@@ -4,6 +4,7 @@ import ProjectView from '../views/ProjectView.vue'
 import SessionView from '../views/SessionView.vue'
 import SearchView from '../views/SearchView.vue'
 import StatsView from '../views/StatsView.vue'
+import HermesSessionView from '../views/HermesSessionView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -33,6 +34,11 @@ const router = createRouter({
       path: '/stats',
       name: 'stats',
       component: StatsView
+    },
+    {
+      path: '/hermes/session',
+      name: 'hermes-session',
+      component: HermesSessionView
     }
   ]
 })
