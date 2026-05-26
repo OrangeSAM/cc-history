@@ -69,3 +69,38 @@ export interface SessionStats {
   toolCalls: number
   durationMs: number
 }
+
+export interface DailyUsage {
+  date: string
+  input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  cache_write_tokens: number
+}
+
+export interface ProjectUsage {
+  project_id: string
+  project_name: string
+  input_tokens: number
+  output_tokens: number
+  cache_read_tokens: number
+  cache_write_tokens: number
+  session_count: number
+}
+
+export interface ModelUsage {
+  model: string
+  input_tokens: number
+  output_tokens: number
+}
+
+export interface UsageStats {
+  daily_usage: DailyUsage[]
+  project_usage: ProjectUsage[]
+  model_usage: ModelUsage[]
+  total_input_tokens: number
+  total_output_tokens: number
+  total_cache_read_tokens: number
+  total_cache_write_tokens: number
+  period_days: number
+}
