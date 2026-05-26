@@ -38,7 +38,8 @@ async function doSearch() {
         for (const line of lines) {
           try {
             const data = JSON.parse(line)
-            const msgContent = data.message?.content
+            // Hermes format: data.content (string); Claude format: data.message.content
+            const msgContent = data.content ?? data.message?.content
             let text = ''
             if (typeof msgContent === 'string') {
               text = msgContent

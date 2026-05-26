@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { getUsageStats } from '../api'
-import type { UsageStats, DailyUsage } from '../types'
+import { getUsageStats, getHermesSessions } from '../api'
+import type { UsageStats, DailyUsage, HermesSession } from '../types'
 import { useTheme } from '../composables/useTheme'
 
 const router = useRouter()
@@ -11,6 +11,8 @@ const { theme, toggleTheme } = useTheme()
 const stats = ref<UsageStats | null>(null)
 const loading = ref(true)
 const error = ref('')
+const activeSource = ref<'claude' | 'hermes'>('claude')
+const hermesSessions = ref<HermesSession[]>([])
 const hoveredDay = ref<DailyUsage | null>(null)
 const chartHoverX = ref(-1)
 
@@ -144,15 +146,35 @@ function fmtPercent(n: number): string {
   return n.toFixed(1) + '%'
 }
 
-onMounted(async () => {
+async function loadStats() {
+  loading.value = true
+  error.value = ''
   try {
-    stats.value = await getUsageStats()
+    if (activeSource.value === 'hermes') {
+      const [s, h] = await Promise.all([
+        getUsageStats('hermes'),
+        getHermesSessions().catch(() => [] as HermesSession[]),
+      ])
+      stats.value = s
+      hermesSessions.value = h
+    } else {
+      stats.value = await getUsageStats('claude')
+      hermesSessions.value = []
+    }
   } catch (err) {
     console.error('Error:', err)
     error.value = '加载统计数据失败'
   } finally {
     loading.value = false
   }
+}
+
+onMounted(() => {
+  loadStats()
+})
+
+watch(activeSource, () => {
+  loadStats()
 })
 </script>
 
@@ -161,7 +183,7 @@ onMounted(async () => {
     <!-- Header -->
     <header class="sticky top-0 z-10 border-b" style="background: var(--bg-secondary); border-color: var(--border-color);">
       <div class="max-w-5xl mx-auto px-6 py-4">
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between mb-3">
           <div class="flex items-center gap-4">
             <button @click="router.push({ name: 'home' })" class="p-2 rounded-lg transition-colors hover:bg-white/5" style="color: var(--text-secondary);">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -178,6 +200,25 @@ onMounted(async () => {
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
             </svg>
           </button>
+        </div>
+      </div>
+      <!-- Source toggle -->
+      <div class="max-w-5xl mx-auto px-6 pt-4">
+        <div class="flex rounded-lg border p-0.5" style="background: var(--bg-secondary); border-color: var(--border-color);">
+          <button
+            @click="activeSource = 'claude'"
+            class="flex-1 py-2 rounded-md text-sm font-medium transition-all"
+            :style="activeSource === 'claude'
+              ? { background: 'var(--accent)', color: '#000' }
+              : { color: 'var(--text-muted)' }"
+          >Claude Code</button>
+          <button
+            @click="activeSource = 'hermes'"
+            class="flex-1 py-2 rounded-md text-sm font-medium transition-all"
+            :style="activeSource === 'hermes'
+              ? { background: '#8b5cf6', color: '#fff' }
+              : { color: 'var(--text-muted)' }"
+          >Hermes</button>
         </div>
       </div>
     </header>
@@ -281,9 +322,9 @@ onMounted(async () => {
         </div>
 
         <!-- Project ranking + Model breakdown (side by side on large screens) -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <!-- Project ranking -->
-          <div v-if="stats.project_usage.length > 0" class="rounded-xl border p-6" style="background: var(--bg-card); border-color: var(--border-color);">
+        <div :class="activeSource === 'claude' ? 'grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8' : 'mb-8'">
+          <!-- Project ranking (Claude only) -->
+          <div v-if="activeSource === 'claude' && stats.project_usage.length > 0" class="rounded-xl border p-6" style="background: var(--bg-card); border-color: var(--border-color);">
             <h2 class="text-sm font-medium mb-4" style="color: var(--text-secondary);">项目排名</h2>
             <div class="space-y-2">
               <div
@@ -330,8 +371,8 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- All projects detail table -->
-        <div v-if="stats.project_usage.length > 0" class="rounded-xl border overflow-hidden" style="background: var(--bg-card); border-color: var(--border-color);">
+        <!-- All projects detail table (Claude only) -->
+        <div v-if="activeSource === 'claude' && stats.project_usage.length > 0" class="rounded-xl border overflow-hidden" style="background: var(--bg-card); border-color: var(--border-color);">
           <div class="overflow-x-auto">
             <table class="w-full text-xs">
               <thead>
@@ -358,6 +399,40 @@ onMounted(async () => {
                   <td class="p-3 text-right" style="color: #fb923c;">{{ fmtNum(p.output_tokens) }}</td>
                   <td class="p-3 text-right" style="color: var(--text-secondary);">{{ fmtNum(p.cache_read_tokens) }}</td>
                   <td class="p-3 text-right" style="color: var(--text-secondary);">{{ fmtNum(p.cache_write_tokens) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Hermes session detail table -->
+        <div v-if="activeSource === 'hermes' && hermesSessions.length > 0" class="rounded-xl border overflow-hidden" style="background: var(--bg-card); border-color: var(--border-color);">
+          <div class="overflow-x-auto">
+            <table class="w-full text-xs">
+              <thead>
+                <tr style="border-bottom: 1px solid var(--border-color);">
+                  <th class="text-left p-3" style="color: var(--text-muted);">会话</th>
+                  <th class="text-right p-3" style="color: var(--text-muted);">Model</th>
+                  <th class="text-right p-3" style="color: var(--text-muted);">Input</th>
+                  <th class="text-right p-3" style="color: var(--text-muted);">Output</th>
+                  <th class="text-right p-3" style="color: var(--text-muted);">Cache Read</th>
+                  <th class="text-right p-3" style="color: var(--text-muted);">Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="s in hermesSessions"
+                  :key="s.id"
+                  @click="router.push({ name: 'hermes-session', query: { id: s.id } })"
+                  class="cursor-pointer transition-colors hover:bg-white/5"
+                  style="border-bottom: 1px solid var(--border-color);"
+                >
+                  <td class="p-3 max-w-xs truncate" style="color: var(--text-primary);">{{ s.title || s.id.slice(0, 8) + '...' }}</td>
+                  <td class="p-3 text-right" style="color: var(--text-secondary);">{{ s.model }}</td>
+                  <td class="p-3 text-right" style="color: #60a5fa;">{{ fmtNum(s.input_tokens) }}</td>
+                  <td class="p-3 text-right" style="color: #fb923c;">{{ fmtNum(s.output_tokens) }}</td>
+                  <td class="p-3 text-right" style="color: var(--text-secondary);">{{ fmtNum(s.cache_read_tokens) }}</td>
+                  <td class="p-3 text-right" style="color: var(--accent);">{{ fmtCost(s.estimated_cost_usd) }}</td>
                 </tr>
               </tbody>
             </table>

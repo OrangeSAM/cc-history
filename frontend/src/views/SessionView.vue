@@ -78,8 +78,82 @@ async function loadMessages() {
   }
 }
 
+function isHermesFormat(firstLine: string): boolean {
+  try {
+    const data = JSON.parse(firstLine)
+    return data.role !== undefined && data.type === undefined
+  } catch {
+    return false
+  }
+}
+
+function parseHermesMessages(content: string): { msgs: Message[]; sessionStats: SessionStats } {
+  const lines = content.split('\n').filter(line => line.trim())
+  const msgs: Message[] = []
+  const sessionStats: SessionStats = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, toolCalls: 0, durationMs: 0 }
+  let firstTs = 0
+  let lastTs = 0
+
+  for (const line of lines) {
+    try {
+      const data = JSON.parse(line)
+      const role = data.role
+
+      const ts = data.timestamp ? new Date(data.timestamp).getTime() : 0
+      if (ts) {
+        if (!firstTs || ts < firstTs) firstTs = ts
+        if (ts > lastTs) lastTs = ts
+      }
+
+      if (role === 'session_meta') {
+        msgs.push({
+          id: data.timestamp || '',
+          type: 'snapshot',
+          content: `Session: model=${data.model || '?'}, platform=${data.platform || 'cli'}`,
+          blocks: [],
+          timestamp: data.timestamp || ''
+        })
+      } else if (role === 'user') {
+        const text = typeof data.content === 'string' ? data.content : ''
+        msgs.push({
+          id: data.timestamp || '',
+          type: 'user',
+          content: text,
+          blocks: [{ type: 'text', text }],
+          timestamp: data.timestamp || ''
+        })
+      } else if (role === 'assistant') {
+        const blocks: ContentBlock[] = []
+        if (data.reasoning) {
+          blocks.push({ type: 'thinking', thinking: data.reasoning })
+        }
+        const text = typeof data.content === 'string' ? data.content : ''
+        if (text) {
+          blocks.push({ type: 'text', text })
+        }
+        msgs.push({
+          id: data.timestamp || '',
+          type: 'assistant',
+          content: text,
+          blocks,
+          timestamp: data.timestamp || ''
+        })
+      }
+    } catch {
+      // skip invalid JSON
+    }
+  }
+
+  if (firstTs && lastTs) sessionStats.durationMs = lastTs - firstTs
+  return { msgs, sessionStats }
+}
+
 function parseMessages(content: string): { msgs: Message[]; sessionStats: SessionStats } {
   const lines = content.split('\n').filter(line => line.trim())
+  if (lines.length > 0 && isHermesFormat(lines[0])) {
+    return parseHermesMessages(content)
+  }
+
   const msgs: Message[] = []
   const sessionStats: SessionStats = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, toolCalls: 0, durationMs: 0 }
   let firstTs = 0
