@@ -1,3 +1,4 @@
+use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -204,6 +205,31 @@ pub struct ModelUsage {
     pub output_tokens: u64,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct HermesSession {
+    pub id: String,
+    pub model: String,
+    pub title: String,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub cache_read_tokens: u64,
+    pub cache_write_tokens: u64,
+    pub estimated_cost_usd: f64,
+    pub billing_provider: String,
+    pub message_count: u32,
+    pub tool_call_count: u32,
+    pub started_at: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct HermesMessage {
+    pub id: u64,
+    pub role: String,
+    pub content: String,
+    pub reasoning: Option<String>,
+    pub timestamp: Option<String>,
+}
+
 #[tauri::command]
 fn get_session_previews(project_id: String) -> Result<Vec<SessionPreview>, String> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
@@ -324,12 +350,29 @@ fn get_session_previews(project_id: String) -> Result<Vec<SessionPreview>, Strin
     Ok(previews)
 }
 
+fn ts_to_date(secs: f64) -> String {
+    let secs = secs as i64;
+    let days = secs / 86400;
+    // Algorithm from http://howardhinnant.github.io/date_algorithms.html
+    let z = days + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = (z - era * 146097) as u32;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = (yoe as i64) + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = if m <= 2 { y + 1 } else { y };
+    format!("{:04}-{:02}-{:02}", y, m, d)
+}
+
 #[tauri::command]
-fn get_usage_stats() -> Result<UsageStats, String> {
+fn get_usage_stats(source: String) -> Result<UsageStats, String> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
     let projects_dir = home.join(".claude/projects");
 
-    if !projects_dir.exists() {
+    if !projects_dir.exists() && source != "hermes" {
         return Ok(UsageStats {
             daily_usage: vec![],
             project_usage: vec![],
@@ -346,7 +389,8 @@ fn get_usage_stats() -> Result<UsageStats, String> {
     let mut project_map: HashMap<String, ProjectUsage> = HashMap::new();
     let mut model_map: HashMap<String, ModelUsage> = HashMap::new();
 
-    if let Ok(entries) = fs::read_dir(&projects_dir) {
+    if source != "hermes" {
+        if let Ok(entries) = fs::read_dir(&projects_dir) {
         for entry in entries.flatten() {
             let project_path = entry.path();
             if !project_path.is_dir() {
@@ -487,6 +531,95 @@ fn get_usage_stats() -> Result<UsageStats, String> {
             }
         }
     }
+    }
+
+    // Collect Hermes data from state.db
+    if source != "claude" {
+        let hermes_db = home.join(".hermes/state.db");
+        if hermes_db.exists() {
+        if let Ok(conn) = Connection::open(&hermes_db) {
+            if let Ok(mut stmt) = conn.prepare(
+                "SELECT COALESCE(model,''), input_tokens, output_tokens, cache_read_tokens, cache_write_tokens, started_at
+                 FROM sessions WHERE input_tokens > 0 OR output_tokens > 0"
+            ) {
+                if let Ok(rows) = stmt.query_map([], |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, u64>(1)?,
+                        row.get::<_, u64>(2)?,
+                        row.get::<_, u64>(3)?,
+                        row.get::<_, u64>(4)?,
+                        row.get::<_, f64>(5).unwrap_or(0.0),
+                    ))
+                }) {
+                    let mut hermes_input: u64 = 0;
+                    let mut hermes_output: u64 = 0;
+                    let mut hermes_cache_read: u64 = 0;
+                    let mut hermes_cache_write: u64 = 0;
+                    let hermes_id = "__hermes__".to_string();
+                    let hermes_name = "Hermes".to_string();
+                    let mut session_count: u32 = 0;
+
+                    for row in rows.flatten() {
+                        let (model, input, output, cache_read, cache_write, started_at) = row;
+                        hermes_input += input;
+                        hermes_output += output;
+                        hermes_cache_read += cache_read;
+                        hermes_cache_write += cache_write;
+                        session_count += 1;
+
+                        // Daily aggregation
+                        let date = if started_at > 0.0 {
+                            ts_to_date(started_at)
+                        } else {
+                            continue;
+                        };
+
+                        daily_map.entry(date)
+                            .and_modify(|d| {
+                                d.input_tokens += input;
+                                d.output_tokens += output;
+                                d.cache_read_tokens += cache_read;
+                                d.cache_write_tokens += cache_write;
+                            })
+                            .or_insert(DailyUsage {
+                                date: "".to_string(), // placeholder, overwritten below if needed
+                                input_tokens: input,
+                                output_tokens: output,
+                                cache_read_tokens: cache_read,
+                                cache_write_tokens: cache_write,
+                            });
+
+                        // Model aggregation
+                        model_map.entry(model.clone())
+                            .and_modify(|m| {
+                                m.input_tokens += input;
+                                m.output_tokens += output;
+                            })
+                            .or_insert(ModelUsage {
+                                model,
+                                input_tokens: input,
+                                output_tokens: output,
+                            });
+                    }
+
+                    // Project aggregation for Hermes
+                    if session_count > 0 {
+                        project_map.insert(hermes_id.clone(), ProjectUsage {
+                            project_id: hermes_id,
+                            project_name: hermes_name,
+                            input_tokens: hermes_input,
+                            output_tokens: hermes_output,
+                            cache_read_tokens: hermes_cache_read,
+                            cache_write_tokens: hermes_cache_write,
+                            session_count,
+                        });
+                    }
+                }
+            }
+        }
+    }
+    }
 
     // Collect and sort
     let mut daily_usage: Vec<DailyUsage> = daily_map.into_values().collect();
@@ -520,11 +653,90 @@ fn get_usage_stats() -> Result<UsageStats, String> {
     })
 }
 
+#[tauri::command]
+fn get_hermes_sessions() -> Result<Vec<HermesSession>, String> {
+    let home = dirs::home_dir().ok_or("Cannot find home directory")?;
+    let db_path = home.join(".hermes/state.db");
+
+    if !db_path.exists() {
+        return Ok(vec![]);
+    }
+
+    let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, COALESCE(model,''), COALESCE(title,''), input_tokens, output_tokens,
+                    cache_read_tokens, cache_write_tokens, estimated_cost_usd,
+                    COALESCE(billing_provider,''), message_count, tool_call_count, started_at
+             FROM sessions ORDER BY started_at DESC",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let sessions = stmt
+        .query_map([], |row| {
+            Ok(HermesSession {
+                id: row.get(0)?,
+                model: row.get(1)?,
+                title: row.get(2)?,
+                input_tokens: row.get(3)?,
+                output_tokens: row.get(4)?,
+                cache_read_tokens: row.get(5)?,
+                cache_write_tokens: row.get(6)?,
+                estimated_cost_usd: row.get(7)?,
+                billing_provider: row.get(8)?,
+                message_count: row.get(9)?,
+                tool_call_count: row.get(10)?,
+                started_at: row.get::<_, f64>(11).map(|t| format!("{:.0}", t)).unwrap_or_default(),
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(sessions)
+}
+
+#[tauri::command]
+fn get_hermes_messages(session_id: String) -> Result<Vec<HermesMessage>, String> {
+    let home = dirs::home_dir().ok_or("Cannot find home directory")?;
+    let db_path = home.join(".hermes/state.db");
+
+    if !db_path.exists() {
+        return Ok(vec![]);
+    }
+
+    let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, role, COALESCE(content,''), reasoning, timestamp
+             FROM messages WHERE session_id = ?1 ORDER BY id",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let messages = stmt
+        .query_map([&session_id], |row| {
+            Ok(HermesMessage {
+                id: row.get(0)?,
+                role: row.get(1)?,
+                content: row.get(2)?,
+                reasoning: row.get(3)?,
+                timestamp: row.get::<_, f64>(4).ok().map(|t| format!("{:.0}", t)),
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(messages)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
-        .invoke_handler(tauri::generate_handler![get_projects, get_sessions, get_messages, get_session_previews, get_usage_stats])
+        .invoke_handler(tauri::generate_handler![get_projects, get_sessions, get_messages, get_session_previews, get_usage_stats, get_hermes_sessions, get_hermes_messages])
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(
