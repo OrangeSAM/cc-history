@@ -53,6 +53,8 @@ export interface Message {
   content: string
   blocks: ContentBlock[]
   timestamp: string
+  /** When a "user" message contains only tool_result blocks (no actual human input) */
+  subtype?: 'tool_result'
 }
 
 export interface UserMessageOutline {

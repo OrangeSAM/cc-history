@@ -24,7 +24,7 @@ const { theme, toggleTheme } = useTheme()
 
 const userOutlines = computed(() => {
   return messages.value
-    .filter(msg => msg.type === 'user')
+    .filter(msg => msg.type === 'user' && msg.subtype !== 'tool_result')
     .map((msg, i) => ({
       index: messages.value.indexOf(msg),
       outlineIndex: i,
@@ -203,12 +203,14 @@ function parseMessages(content: string): { msgs: Message[]; sessionStats: Sessio
         }
         const text = textParts.join('')
         if (text.trim() || blocks.some(b => b.type === 'tool_result')) {
+          const hasUserText = text.trim().length > 0
           msgs.push({
             id: data.uuid || data.messageId || '',
             type: 'user',
             content: text,
             blocks,
-            timestamp: data.timestamp || ''
+            timestamp: data.timestamp || '',
+            subtype: hasUserText ? undefined : 'tool_result',
           })
         }
       } else if (type === 'assistant') {
@@ -442,15 +444,15 @@ function toolResultText(block: any): string {
             >
               <!-- Icon -->
               <div class="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold mt-1"
-                :style="msg.type === 'user' ? { background: 'var(--accent)', color: '#000' } : msg.type === 'assistant' ? { background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--accent)' } : { background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-muted)' }"
+                :style="msg.subtype === 'tool_result' ? { background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-muted)' } : msg.type === 'user' ? { background: 'var(--accent)', color: '#000' } : msg.type === 'assistant' ? { background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--accent)' } : { background: 'var(--bg-card)', border: '1px solid var(--border-color)', color: 'var(--text-muted)' }"
               >
-                {{ msg.type === 'user' ? 'U' : msg.type === 'assistant' ? 'A' : 'S' }}
+                {{ msg.subtype === 'tool_result' ? 'R' : msg.type === 'user' ? 'U' : msg.type === 'assistant' ? 'A' : 'S' }}
               </div>
 
               <!-- Content -->
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2 mb-2">
-                  <span class="text-xs font-medium" style="color: var(--text-secondary);">{{ msg.type === 'user' ? 'User' : msg.type === 'assistant' ? 'Assistant' : 'Snapshot' }}</span>
+                  <span class="text-xs font-medium" style="color: var(--text-secondary);">{{ msg.subtype === 'tool_result' ? 'Tool Result' : msg.type === 'user' ? 'User' : msg.type === 'assistant' ? 'Assistant' : 'Snapshot' }}</span>
                   <span v-if="msg.timestamp" class="text-xs" style="color: var(--text-muted);">{{ formatDate(msg.timestamp) }}</span>
                 </div>
 
