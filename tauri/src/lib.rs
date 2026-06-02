@@ -4,6 +4,34 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::BufRead;
 use std::io::BufReader;
+use std::path::Path;
+
+/// Recursively find all .jsonl files under a directory.
+/// Returns (relative_id, full_path) where relative_id is the path relative to the
+/// project directory with the .jsonl extension stripped.
+fn find_jsonl_files(dir: &Path) -> Vec<(String, std::path::PathBuf)> {
+    let mut results = Vec::new();
+    find_jsonl_files_impl(dir, dir, &mut results);
+    results
+}
+
+fn find_jsonl_files_impl(base: &Path, current: &Path, results: &mut Vec<(String, std::path::PathBuf)>) {
+    let Ok(entries) = fs::read_dir(current) else { return };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let Some(name) = path.file_name().and_then(|n| n.to_str()) else { continue };
+        if name.starts_with('.') {
+            continue;
+        }
+        if path.is_dir() {
+            find_jsonl_files_impl(base, &path, results);
+        } else if path.extension().and_then(|e| e.to_str()) == Some("jsonl") {
+            let rel = path.strip_prefix(base).unwrap_or(&path);
+            let id = rel.with_extension("").to_string_lossy().to_string();
+            results.push((id, path));
+        }
+    }
+}
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Project {
@@ -47,26 +75,19 @@ fn get_projects() -> Result<Vec<Project>, String> {
                     continue;
                 }
 
-                let session_count = fs::read_dir(&path)
-                    .map(|entries| {
-                        entries.flatten()
-                            .filter(|e| e.path().to_string_lossy().ends_with(".jsonl"))
-                            .count()
-                    })
-                    .unwrap_or(0);
+                let jsonl_files = find_jsonl_files(&path);
+                let session_count = jsonl_files.len();
 
                 if session_count == 0 {
                     continue;
                 }
 
                 let mut last_modified = String::new();
-                if let Ok(entries) = fs::read_dir(&path) {
-                    if let Some(first) = entries.flatten().find(|e| e.path().to_string_lossy().ends_with(".jsonl")) {
-                        if let Ok(metadata) = first.metadata() {
-                            if let Ok(time) = metadata.modified() {
-                                if let Ok(duration) = time.duration_since(std::time::UNIX_EPOCH) {
-                                    last_modified = format!("{}", duration.as_secs());
-                                }
+                if let Some((_, first_path)) = jsonl_files.first() {
+                    if let Ok(metadata) = first_path.metadata() {
+                        if let Ok(time) = metadata.modified() {
+                            if let Ok(duration) = time.duration_since(std::time::UNIX_EPOCH) {
+                                last_modified = format!("{}", duration.as_secs());
                             }
                         }
                     }
@@ -114,39 +135,26 @@ fn get_sessions(project_id: String) -> Result<Vec<Session>, String> {
 
     let mut sessions: Vec<Session> = vec![];
 
-    if let Ok(entries) = fs::read_dir(&project_path) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let filename = path.file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("");
+    for (id, path) in find_jsonl_files(&project_path) {
+        let mut last_modified = String::new();
+        let mut size = 0u64;
 
-            if !filename.ends_with(".jsonl") {
-                continue;
-            }
-
-            let id = filename.replace(".jsonl", "");
-
-            let mut last_modified = String::new();
-            let mut size = 0u64;
-
-            if let Ok(metadata) = entry.metadata() {
-                if let Ok(time) = metadata.modified() {
-                    if let Ok(duration) = time.duration_since(std::time::UNIX_EPOCH) {
-                        last_modified = format!("{}", duration.as_secs());
-                    }
+        if let Ok(metadata) = path.metadata() {
+            if let Ok(time) = metadata.modified() {
+                if let Ok(duration) = time.duration_since(std::time::UNIX_EPOCH) {
+                    last_modified = format!("{}", duration.as_secs());
                 }
-                size = metadata.len();
             }
-
-            sessions.push(Session {
-                id: id.clone(),
-                name: id,
-                path: path.to_string_lossy().to_string(),
-                last_modified,
-                size,
-            });
+            size = metadata.len();
         }
+
+        sessions.push(Session {
+            id: id.clone(),
+            name: id,
+            path: path.to_string_lossy().to_string(),
+            last_modified,
+            size,
+        });
     }
 
     sessions.sort_by(|a, b| b.last_modified.cmp(&a.last_modified));
@@ -241,109 +249,88 @@ fn get_session_previews(project_id: String) -> Result<Vec<SessionPreview>, Strin
 
     let mut previews: Vec<SessionPreview> = vec![];
 
-    if let Ok(entries) = fs::read_dir(&project_path) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            let filename = path.file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or("");
+    for (id, path) in find_jsonl_files(&project_path) {
+        let file = match fs::File::open(&path) {
+            Ok(f) => f,
+            Err(_) => continue,
+        };
+        let reader = BufReader::new(file);
 
-            if !filename.ends_with(".jsonl") {
-                continue;
-            }
+        let message_count = reader.lines().count();
 
-            let id = filename.replace(".jsonl", "");
+        let file = match fs::File::open(&path) {
+            Ok(f) => f,
+            Err(_) => continue,
+        };
+        let reader = BufReader::new(file);
 
-            // 读取文件获取预览
-            let file = match fs::File::open(&path) {
-                Ok(f) => f,
-                Err(_) => continue,
-            };
-            let reader = BufReader::new(file);
+        let mut lines: Vec<String> = vec![];
+        let mut last_modified = String::new();
 
-            // 先统计总行数（消息数量）
-            let message_count = reader.lines().count();
+        for line in reader.lines().take(20) {
+            if let Ok(line) = line {
+                lines.push(line.clone());
 
-            // 重新打开文件获取预览
-            let file = match fs::File::open(&path) {
-                Ok(f) => f,
-                Err(_) => continue,
-            };
-            let reader = BufReader::new(file);
-
-            let mut lines: Vec<String> = vec![];
-            let mut last_modified = String::new();
-
-            for line in reader.lines().take(20) {
-                if let Ok(line) = line {
-                    lines.push(line.clone());
-
-                    // 尝试解析获取第一条消息的时间戳
-                    if let Ok(data) = serde_json::from_str::<serde_json::Value>(&line) {
-                        if last_modified.is_empty() {
-                            // 支持秒级时间戳数字或字符串
-                            if let Some(ts) = data.get("timestamp") {
-                                if let Some(ts_str) = ts.as_str() {
-                                    // 如果是数字字符串，转换为 i64
-                                    if let Ok(ts_num) = ts_str.parse::<i64>() {
-                                        last_modified = ts_num.to_string();
-                                    }
-                                } else if let Some(ts_num) = ts.as_i64() {
+                if let Ok(data) = serde_json::from_str::<serde_json::Value>(&line) {
+                    if last_modified.is_empty() {
+                        if let Some(ts) = data.get("timestamp") {
+                            if let Some(ts_str) = ts.as_str() {
+                                if let Ok(ts_num) = ts_str.parse::<i64>() {
                                     last_modified = ts_num.to_string();
                                 }
+                            } else if let Some(ts_num) = ts.as_i64() {
+                                last_modified = ts_num.to_string();
                             }
                         }
                     }
                 }
             }
-
-            // 从消息中提取预览文本
-            let mut preview = String::new();
-            for line in &lines {
-                if let Ok(data) = serde_json::from_str::<serde_json::Value>(line) {
-                    let msg_type = data.get("type").and_then(|v| v.as_str()).unwrap_or("");
-                    if msg_type == "user" {
-                        if let Some(content) = data.get("message").and_then(|m| m.get("content")) {
-                            if let Some(text) = content.as_str() {
-                                preview = text.chars().take(100).collect();
-                                if text.len() > 100 {
-                                    preview.push_str("...");
-                                }
-                                break;
-                            } else if let Some(arr) = content.as_array() {
-                                if let Some(first) = arr.first() {
-                                    if let Some(text) = first.get("text").and_then(|v| v.as_str()) {
-                                        preview = text.chars().take(100).collect();
-                                        if text.len() > 100 {
-                                            preview.push_str("...");
-                                        }
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 获取文件修改时间
-            if last_modified.is_empty() {
-                if let Ok(metadata) = entry.metadata() {
-                    if let Ok(time) = metadata.modified() {
-                        if let Ok(duration) = time.duration_since(std::time::UNIX_EPOCH) {
-                            last_modified = duration.as_secs().to_string();
-                        }
-                    }
-                }
-            }
-
-            previews.push(SessionPreview {
-                id,
-                preview,
-                message_count,
-                last_modified,
-            });
         }
+
+        let mut preview = String::new();
+        for line in &lines {
+            if let Ok(data) = serde_json::from_str::<serde_json::Value>(line) {
+                let msg_type = data.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                if msg_type == "user" {
+                    if let Some(content) = data.get("message").and_then(|m| m.get("content")) {
+                        if let Some(text) = content.as_str() {
+                            preview = text.chars().take(100).collect();
+                            if text.len() > 100 {
+                                preview.push_str("...");
+                            }
+                            break;
+                        } else if let Some(arr) = content.as_array() {
+                            if let Some(first) = arr.first() {
+                                if let Some(text) = first.get("text").and_then(|v| v.as_str()) {
+                                    preview = text.chars().take(100).collect();
+                                    if text.len() > 100 {
+                                        preview.push_str("...");
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if last_modified.is_empty() {
+            if let Ok(metadata) = path.metadata() {
+                if let Ok(time) = metadata.modified() {
+                    if let Ok(duration) = time.duration_since(std::time::UNIX_EPOCH) {
+                        last_modified = duration.as_secs().to_string();
+                    }
+                }
+            }
+        }
+
+        previews.push(SessionPreview {
+            id,
+            preview,
+            message_count,
+            last_modified,
+        });
     }
 
     previews.sort_by(|a, b| b.last_modified.cmp(&a.last_modified));
@@ -422,106 +409,98 @@ fn get_usage_stats(source: String) -> Result<UsageStats, String> {
                 stripped.replace("-", " / ")
             };
 
-            let mut session_count = 0u32;
+            let jsonl_files = find_jsonl_files(&project_path);
+            let session_count = jsonl_files.len() as u32;
 
-            if let Ok(session_entries) = fs::read_dir(&project_path) {
-                for session_entry in session_entries.flatten() {
-                    let session_path = session_entry.path();
-                    if !session_path.to_string_lossy().ends_with(".jsonl") {
+            for (_id, session_path) in &jsonl_files {
+                let file = match fs::File::open(session_path) {
+                    Ok(f) => f,
+                    Err(_) => continue,
+                };
+                let reader = BufReader::new(file);
+
+                for line in reader.lines() {
+                    let line = match line {
+                        Ok(l) => l,
+                        Err(_) => continue,
+                    };
+
+                    let data: serde_json::Value = match serde_json::from_str(&line) {
+                        Ok(d) => d,
+                        Err(_) => continue,
+                    };
+
+                    if data.get("type").and_then(|v| v.as_str()) != Some("assistant") {
                         continue;
                     }
 
-                    session_count += 1;
-
-                    let file = match fs::File::open(&session_path) {
-                        Ok(f) => f,
-                        Err(_) => continue,
+                    let usage = match data.get("message").and_then(|m| m.get("usage")) {
+                        Some(u) => u,
+                        None => continue,
                     };
-                    let reader = BufReader::new(file);
 
-                    for line in reader.lines() {
-                        let line = match line {
-                            Ok(l) => l,
-                            Err(_) => continue,
-                        };
+                    let input_tokens = usage.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let output_tokens = usage.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let cache_read = usage.get("cache_read_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let cache_write = usage.get("cache_creation_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
 
-                        let data: serde_json::Value = match serde_json::from_str(&line) {
-                            Ok(d) => d,
-                            Err(_) => continue,
-                        };
+                    let model = data.get("message")
+                        .and_then(|m| m.get("model"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown")
+                        .to_string();
 
-                        if data.get("type").and_then(|v| v.as_str()) != Some("assistant") {
-                            continue;
-                        }
+                    // Extract date from timestamp (YYYY-MM-DD)
+                    let date = data.get("timestamp")
+                        .and_then(|v| v.as_str())
+                        .map(|ts| ts.chars().take(10).collect::<String>())
+                        .unwrap_or_else(|| "unknown".to_string());
 
-                        let usage = match data.get("message").and_then(|m| m.get("usage")) {
-                            Some(u) => u,
-                            None => continue,
-                        };
+                    // Aggregate by day
+                    daily_map.entry(date.clone())
+                        .and_modify(|d| {
+                            d.input_tokens += input_tokens;
+                            d.output_tokens += output_tokens;
+                            d.cache_read_tokens += cache_read;
+                            d.cache_write_tokens += cache_write;
+                        })
+                        .or_insert(DailyUsage {
+                            date,
+                            input_tokens,
+                            output_tokens,
+                            cache_read_tokens: cache_read,
+                            cache_write_tokens: cache_write,
+                        });
 
-                        let input_tokens = usage.get("input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-                        let output_tokens = usage.get("output_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-                        let cache_read = usage.get("cache_read_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-                        let cache_write = usage.get("cache_creation_input_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+                    // Aggregate by project
+                    project_map.entry(project_name_raw.clone())
+                        .and_modify(|p| {
+                            p.input_tokens += input_tokens;
+                            p.output_tokens += output_tokens;
+                            p.cache_read_tokens += cache_read;
+                            p.cache_write_tokens += cache_write;
+                        })
+                        .or_insert(ProjectUsage {
+                            project_id: project_name_raw.clone(),
+                            project_name: display_name.clone(),
+                            input_tokens,
+                            output_tokens,
+                            cache_read_tokens: cache_read,
+                            cache_write_tokens: cache_write,
+                            session_count: 0,
+                        });
 
-                        let model = data.get("message")
-                            .and_then(|m| m.get("model"))
-                            .and_then(|v| v.as_str())
-                            .unwrap_or("unknown")
-                            .to_string();
-
-                        // Extract date from timestamp (YYYY-MM-DD)
-                        let date = data.get("timestamp")
-                            .and_then(|v| v.as_str())
-                            .map(|ts| ts.chars().take(10).collect::<String>())
-                            .unwrap_or_else(|| "unknown".to_string());
-
-                        // Aggregate by day
-                        daily_map.entry(date.clone())
-                            .and_modify(|d| {
-                                d.input_tokens += input_tokens;
-                                d.output_tokens += output_tokens;
-                                d.cache_read_tokens += cache_read;
-                                d.cache_write_tokens += cache_write;
-                            })
-                            .or_insert(DailyUsage {
-                                date,
-                                input_tokens,
-                                output_tokens,
-                                cache_read_tokens: cache_read,
-                                cache_write_tokens: cache_write,
-                            });
-
-                        // Aggregate by project
-                        project_map.entry(project_name_raw.clone())
-                            .and_modify(|p| {
-                                p.input_tokens += input_tokens;
-                                p.output_tokens += output_tokens;
-                                p.cache_read_tokens += cache_read;
-                                p.cache_write_tokens += cache_write;
-                            })
-                            .or_insert(ProjectUsage {
-                                project_id: project_name_raw.clone(),
-                                project_name: display_name.clone(),
-                                input_tokens,
-                                output_tokens,
-                                cache_read_tokens: cache_read,
-                                cache_write_tokens: cache_write,
-                                session_count: 0,
-                            });
-
-                        // Aggregate by model
-                        model_map.entry(model.clone())
-                            .and_modify(|m| {
-                                m.input_tokens += input_tokens;
-                                m.output_tokens += output_tokens;
-                            })
-                            .or_insert(ModelUsage {
-                                model,
-                                input_tokens,
-                                output_tokens,
-                            });
-                    }
+                    // Aggregate by model
+                    model_map.entry(model.clone())
+                        .and_modify(|m| {
+                            m.input_tokens += input_tokens;
+                            m.output_tokens += output_tokens;
+                        })
+                        .or_insert(ModelUsage {
+                            model,
+                            input_tokens,
+                            output_tokens,
+                        });
                 }
             }
 
