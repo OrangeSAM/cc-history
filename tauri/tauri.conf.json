@@ -13,6 +13,8 @@
         "title": "Claude Code 历史",
         "width": 1000,
         "height": 700,
+        "minWidth": 1080,
+        "minHeight": 500,
         "resizable": true,
         "fullscreen": false,
         "center": true
