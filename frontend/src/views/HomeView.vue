@@ -69,7 +69,9 @@ function goToHermesSession(session: HermesSession) {
 
 function getColor(name: string): string {
   const colors = ['#f5a623', '#4ade80', '#60a5fa', '#f472b6', '#a78bfa', '#fbbf24', '#34d399', '#2dd4bf']
-  return colors[name.charCodeAt(0) % colors.length]
+  let hash = 0
+  for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash + name.charCodeAt(i)) | 0
+  return colors[Math.abs(hash) % colors.length]
 }
 
 function fmtNum(n: number): string {
@@ -136,14 +138,14 @@ function cleanTitle(title: string): string {
           @click="activeSource = 'claude'"
           class="flex-1 py-2 rounded-md text-sm font-medium transition-all"
           :style="activeSource === 'claude'
-            ? { background: 'var(--accent)', color: '#000' }
+            ? { background: 'var(--accent)', backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.06) 2px, rgba(0,0,0,0.06) 4px)', color: '#000' }
             : { color: 'var(--text-muted)' }"
         >Claude Code</button>
         <button
           @click="activeSource = 'hermes'"
           class="flex-1 py-2 rounded-md text-sm font-medium transition-all"
           :style="activeSource === 'hermes'
-            ? { background: '#8b5cf6', color: '#fff' }
+            ? { background: '#8b5cf6', backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.08) 2px, rgba(255,255,255,0.08) 4px)', color: '#fff' }
             : { color: 'var(--text-muted)' }"
         >Hermes</button>
       </div>
@@ -205,18 +207,13 @@ function cleanTitle(title: string): string {
       <!-- Claude Code: project list -->
       <div v-else-if="activeSource === 'claude'" class="space-y-3">
         <div v-for="project in projects" :key="project.id" @click="goToProject(project)"
-          class="card-glow rounded-lg border p-4 cursor-pointer"
-          style="background: var(--bg-card); border-color: var(--border-color);">
+          class="card-glow rounded-lg border p-4 cursor-pointer relative overflow-hidden"
+          :style="{ background: 'var(--bg-card)', borderColor: 'var(--border-color)', '--accent-bar': getColor(project.name) }">
+          <div class="absolute left-0 top-0 bottom-0 w-[3px]" :style="{ background: getColor(project.name) }"></div>
           <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3 min-w-0">
-              <div class="w-9 h-9 rounded flex items-center justify-center text-sm font-bold shadow-lg"
-                :style="{ backgroundColor: getColor(project.name), color: '#000' }">
-                {{ project.name.charAt(0).toUpperCase() }}
-              </div>
-              <div class="min-w-0">
-                <h2 class="font-medium truncate" style="color: var(--text-primary);">{{ project.name }}</h2>
-                <p class="text-xs" style="color: var(--text-muted);">{{ project.session_count }} sessions</p>
-              </div>
+            <div class="min-w-0">
+              <h2 class="font-medium truncate" style="color: var(--text-primary);">{{ project.name }}</h2>
+              <p class="text-xs" style="color: var(--text-muted);">{{ project.session_count }} sessions</p>
             </div>
             <div class="text-right flex-shrink-0 ml-3">
               <p class="text-xs" style="color: var(--text-muted);">{{ formatDate(project.last_modified) }}</p>
@@ -229,8 +226,9 @@ function cleanTitle(title: string): string {
       <!-- Hermes: session list -->
       <div v-else-if="activeSource === 'hermes'" class="space-y-3">
         <div v-for="session in hermesSessions" :key="session.id" @click="goToHermesSession(session)"
-          class="card-glow rounded-lg border p-4 cursor-pointer"
+          class="card-glow rounded-lg border p-4 cursor-pointer relative overflow-hidden"
           style="background: var(--bg-card); border-color: var(--border-color);">
+          <div class="absolute left-0 top-0 bottom-0 w-[3px]" style="background: #8b5cf6;"></div>
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0 flex-1">
               <h2 class="text-sm font-medium mb-1 truncate" style="color: var(--text-primary);">{{ cleanTitle(session.title) }}</h2>
