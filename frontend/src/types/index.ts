@@ -129,3 +129,23 @@ export interface UsageStats {
   total_cache_write_tokens: number
   period_days: number
 }
+
+export interface CodexSession {
+  id: string
+  title: string
+  model: string
+  cwd: string
+  created_at: string
+  updated_at: string
+  tokens_used: number
+  first_user_message: string
+  rollout_path: string
+  preview: string
+}
+
+export interface CodexMessage {
+  role: string
+  content: string
+  reasoning: string | null
+  timestamp: string
+}

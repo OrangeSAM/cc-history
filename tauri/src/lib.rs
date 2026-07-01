@@ -238,6 +238,28 @@ pub struct HermesMessage {
     pub timestamp: Option<String>,
 }
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CodexSession {
+    pub id: String,
+    pub title: String,
+    pub model: String,
+    pub cwd: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub tokens_used: u64,
+    pub first_user_message: String,
+    pub rollout_path: String,
+    pub preview: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CodexMessage {
+    pub role: String,
+    pub content: String,
+    pub reasoning: Option<String>,
+    pub timestamp: String,
+}
+
 #[tauri::command]
 fn get_session_previews(project_id: String) -> Result<Vec<SessionPreview>, String> {
     let home = dirs::home_dir().ok_or("Cannot find home directory")?;
@@ -711,11 +733,145 @@ fn get_hermes_messages(session_id: String) -> Result<Vec<HermesMessage>, String>
     Ok(messages)
 }
 
+#[tauri::command]
+fn get_codex_sessions() -> Result<Vec<CodexSession>, String> {
+    let home = dirs::home_dir().ok_or("Cannot find home directory")?;
+    let db_path = home.join(".codex/state_5.sqlite");
+
+    if !db_path.exists() {
+        return Ok(vec![]);
+    }
+
+    let conn = Connection::open(&db_path).map_err(|e| e.to_string())?;
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, COALESCE(title,''), COALESCE(model,''), COALESCE(cwd,''),
+                    created_at, updated_at, tokens_used,
+                    COALESCE(first_user_message,''), COALESCE(rollout_path,''), COALESCE(preview,'')
+             FROM threads WHERE archived = 0 ORDER BY updated_at DESC",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let sessions = stmt
+        .query_map([], |row| {
+            let created_ts: i64 = row.get(4)?;
+            let updated_ts: i64 = row.get(5)?;
+            Ok(CodexSession {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                model: row.get(2)?,
+                cwd: row.get(3)?,
+                created_at: created_ts.to_string(),
+                updated_at: updated_ts.to_string(),
+                tokens_used: row.get::<_, u64>(6).unwrap_or(0),
+                first_user_message: row.get(7)?,
+                rollout_path: row.get(8)?,
+                preview: row.get(9)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(sessions)
+}
+
+#[tauri::command]
+fn get_codex_messages(rollout_path: String) -> Result<Vec<CodexMessage>, String> {
+    let path = Path::new(&rollout_path);
+    if !path.exists() {
+        return Err("Rollout file not found".to_string());
+    }
+
+    let file = fs::File::open(path).map_err(|e| e.to_string())?;
+    let reader = BufReader::new(file);
+    let mut messages: Vec<CodexMessage> = vec![];
+
+    for line in reader.lines() {
+        let line = match line {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
+
+        let data: serde_json::Value = match serde_json::from_str(&line) {
+            Ok(d) => d,
+            Err(_) => continue,
+        };
+
+        let msg_type = data.get("type").and_then(|v| v.as_str()).unwrap_or("");
+        if msg_type != "response_item" {
+            continue;
+        }
+
+        let payload = match data.get("payload") {
+            Some(p) => p,
+            None => continue,
+        };
+
+        let role = payload.get("role").and_then(|v| v.as_str()).unwrap_or("");
+        let item_type = payload.get("type").and_then(|v| v.as_str()).unwrap_or("");
+
+        // Skip non-message items (reasoning, function calls, web search, etc.)
+        if item_type != "message" {
+            continue;
+        }
+
+        // Skip developer messages (system prompts)
+        if role == "developer" {
+            continue;
+        }
+
+        let timestamp = data.get("timestamp").and_then(|v| v.as_str()).unwrap_or("").to_string();
+
+        let content_blocks = payload.get("content").and_then(|v| v.as_array());
+        let mut text_parts: Vec<String> = vec![];
+        let mut reasoning_text: Option<String> = None;
+
+        if let Some(blocks) = content_blocks {
+            for block in blocks {
+                let block_type = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                match block_type {
+                    "input_text" | "output_text" => {
+                        if let Some(text) = block.get("text").and_then(|v| v.as_str()) {
+                            // Skip environment_context and permissions blocks
+                            if role == "user" && (text.starts_with("<environment_context>") || text.starts_with("<permissions")) {
+                                continue;
+                            }
+                            text_parts.push(text.to_string());
+                        }
+                    }
+                    "reasoning" => {
+                        if let Some(text) = block.get("text").and_then(|v| v.as_str()) {
+                            reasoning_text = Some(text.to_string());
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        let content = text_parts.join("\n");
+        if content.is_empty() && reasoning_text.is_none() {
+            continue;
+        }
+
+        messages.push(CodexMessage {
+            role: role.to_string(),
+            content,
+            reasoning: reasoning_text,
+            timestamp,
+        });
+    }
+
+    Ok(messages)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
-        .invoke_handler(tauri::generate_handler![get_projects, get_sessions, get_messages, get_session_previews, get_usage_stats, get_hermes_sessions, get_hermes_messages])
+        .invoke_handler(tauri::generate_handler![get_projects, get_sessions, get_messages, get_session_previews, get_usage_stats, get_hermes_sessions, get_hermes_messages, get_codex_sessions, get_codex_messages])
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(

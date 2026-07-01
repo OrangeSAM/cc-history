@@ -1,17 +1,18 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getProjects, getHermesSessions, getUsageStats } from '../api'
-import type { Project, HermesSession, UsageStats } from '../types'
+import { getProjects, getHermesSessions, getCodexSessions, getUsageStats } from '../api'
+import type { Project, HermesSession, CodexSession, UsageStats } from '../types'
 import { useTheme } from '../composables/useTheme'
 
 const router = useRouter()
 const projects = ref<Project[]>([])
 const hermesSessions = ref<HermesSession[]>([])
+const codexSessions = ref<CodexSession[]>([])
 const claudeStats = ref<UsageStats | null>(null)
 const loading = ref(true)
 const error = ref('')
-const activeSource = ref<'claude' | 'hermes'>('claude')
+const activeSource = ref<'claude' | 'hermes' | 'codex'>('claude')
 const { theme, toggleTheme } = useTheme()
 
 const stats = computed(() => {
@@ -24,7 +25,7 @@ const stats = computed(() => {
       sessionCount: projects.value.reduce((sum, p) => sum + p.session_count, 0),
       totalTokens: total,
     }
-  } else {
+  } else if (activeSource.value === 'hermes') {
     const total = hermesSessions.value.reduce((sum, s) => sum + s.input_tokens + s.output_tokens, 0)
     const cost = hermesSessions.value.reduce((sum, s) => sum + (s.estimated_cost_usd || 0), 0)
     return {
@@ -32,18 +33,26 @@ const stats = computed(() => {
       totalTokens: total,
       totalCost: cost,
     }
+  } else {
+    const total = codexSessions.value.reduce((sum, s) => sum + s.tokens_used, 0)
+    return {
+      sessionCount: codexSessions.value.length,
+      totalTokens: total,
+    }
   }
 })
 
 onMounted(async () => {
   try {
-    const [p, h, s] = await Promise.all([
+    const [p, h, c, s] = await Promise.all([
       getProjects(),
       getHermesSessions().catch(() => [] as HermesSession[]),
+      getCodexSessions().catch(() => [] as CodexSession[]),
       getUsageStats('claude').catch(() => null),
     ])
     projects.value = p
     hermesSessions.value = h
+    codexSessions.value = c
     claudeStats.value = s
   } catch (err) {
     console.error('Error:', err)
@@ -65,6 +74,10 @@ function goToProject(project: Project) {
 
 function goToHermesSession(session: HermesSession) {
   router.push({ name: 'hermes-session', query: { id: session.id } })
+}
+
+function goToCodexSession(session: CodexSession) {
+  router.push({ name: 'codex-session', query: { path: session.rollout_path, title: session.title || session.first_user_message } })
 }
 
 function getColor(name: string): string {
@@ -89,6 +102,13 @@ function fmtCost(n: number): string {
 function cleanTitle(title: string): string {
   if (!title) return '(无标题)'
   return title.replace(/<think>[\s\S]*?<\/think>/g, '').trim().slice(0, 80) || '(无标题)'
+}
+
+function shortenPath(cwd: string): string {
+  if (!cwd) return ''
+  const parts = cwd.split('/')
+  if (parts.length <= 3) return cwd
+  return '…/' + parts.slice(-2).join('/')
 }
 </script>
 
@@ -148,6 +168,13 @@ function cleanTitle(title: string): string {
             ? { background: '#8b5cf6', backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.08) 2px, rgba(255,255,255,0.08) 4px)', color: '#fff' }
             : { color: 'var(--text-muted)' }"
         >Hermes</button>
+        <button
+          @click="activeSource = 'codex'"
+          class="flex-1 py-2 rounded-md text-sm font-medium transition-all"
+          :style="activeSource === 'codex'
+            ? { background: '#10a37f', backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.08) 2px, rgba(255,255,255,0.08) 4px)', color: '#fff' }
+            : { color: 'var(--text-muted)' }"
+        >Codex</button>
       </div>
 
       <!-- Stats summary -->
@@ -168,7 +195,7 @@ function cleanTitle(title: string): string {
             </div>
           </div>
         </div>
-        <div v-else class="mb-8 p-5 rounded-xl border" style="background: var(--bg-card); border-color: var(--border-color);">
+        <div v-else-if="activeSource === 'hermes'" class="mb-8 p-5 rounded-xl border" style="background: var(--bg-card); border-color: var(--border-color);">
           <div class="flex items-center justify-between">
             <div>
               <p class="text-xs" style="color: var(--text-muted);">SESSIONS</p>
@@ -181,6 +208,18 @@ function cleanTitle(title: string): string {
             <div class="text-right">
               <p class="text-xs" style="color: var(--text-muted);">EST. COST</p>
               <p class="text-3xl font-bold text-glow" style="color: #8b5cf6;">{{ fmtCost(stats.totalCost) }}</p>
+            </div>
+          </div>
+        </div>
+        <div v-else class="mb-8 p-5 rounded-xl border" style="background: var(--bg-card); border-color: var(--border-color);">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs" style="color: var(--text-muted);">SESSIONS</p>
+              <p class="text-3xl font-bold text-glow" style="color: #10a37f;">{{ stats.sessionCount }}</p>
+            </div>
+            <div class="text-right">
+              <p class="text-xs" style="color: var(--text-muted);">TOKENS</p>
+              <p class="text-3xl font-bold text-glow" style="color: #10a37f;">{{ fmtNum(stats.totalTokens) }}</p>
             </div>
           </div>
         </div>
@@ -244,6 +283,29 @@ function cleanTitle(title: string): string {
           </div>
         </div>
         <div v-if="hermesSessions.length === 0" class="text-center py-12" style="color: var(--text-muted);">No Hermes sessions found</div>
+      </div>
+
+      <!-- Codex: session list -->
+      <div v-else-if="activeSource === 'codex'" class="space-y-3">
+        <div v-for="session in codexSessions" :key="session.id" @click="goToCodexSession(session)"
+          class="card-glow rounded-lg border p-4 cursor-pointer relative overflow-hidden"
+          style="background: var(--bg-card); border-color: var(--border-color);">
+          <div class="absolute left-0 top-0 bottom-0 w-[3px]" style="background: #10a37f;"></div>
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <h2 class="text-sm font-medium mb-1 truncate" style="color: var(--text-primary);">{{ cleanTitle(session.title || session.first_user_message) }}</h2>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xs" style="color: #10a37f;">{{ session.model }}</span>
+                <span v-if="session.cwd" class="text-xs" style="color: var(--text-muted);">{{ shortenPath(session.cwd) }}</span>
+                <span v-if="session.tokens_used > 0" class="text-xs" style="color: var(--text-muted);">{{ fmtNum(session.tokens_used) }} tokens</span>
+              </div>
+            </div>
+            <div class="text-right flex-shrink-0">
+              <p class="text-xs" style="color: var(--text-muted);">{{ formatDate(session.updated_at) }}</p>
+            </div>
+          </div>
+        </div>
+        <div v-if="codexSessions.length === 0" class="text-center py-12" style="color: var(--text-muted);">No Codex sessions found</div>
       </div>
     </main>
   </div>

@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { Project, SessionPreview, Session, UsageStats, HermesSession, HermesMessage } from '../types'
+import type { Project, SessionPreview, Session, UsageStats, HermesSession, HermesMessage, CodexSession, CodexMessage } from '../types'
 
 export async function getProjects(): Promise<Project[]> {
   return invoke<Project[]>('get_projects')
@@ -27,4 +27,12 @@ export async function getHermesSessions(): Promise<HermesSession[]> {
 
 export async function getHermesMessages(sessionId: string): Promise<HermesMessage[]> {
   return invoke<HermesMessage[]>('get_hermes_messages', { sessionId })
+}
+
+export async function getCodexSessions(): Promise<CodexSession[]> {
+  return invoke<CodexSession[]>('get_codex_sessions')
+}
+
+export async function getCodexMessages(rolloutPath: string): Promise<CodexMessage[]> {
+  return invoke<CodexMessage[]>('get_codex_messages', { rolloutPath })
 }
