@@ -45,14 +45,14 @@ jobs:
         run: npm ci
 
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: tauri
           tagName: v__VERSION__
           releaseName: CC History v__VERSION__
-          releaseBody: ''
+          releaseBody: '## Changes\n\n- 支持查看 Codex 对话记录'
           releaseDraft: true
           prerelease: false
           args: --target ${{ matrix.target }}
