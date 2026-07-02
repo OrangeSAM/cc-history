@@ -1,14 +1,24 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useTheme } from '../composables/useTheme'
 import { check, type Update } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
+import { getVersion } from '@tauri-apps/api/app'
 
 const router = useRouter()
 const { theme, toggleTheme } = useTheme()
 
 const activeTab = ref<'general' | 'about'>('general')
+const appVersion = ref('')
+
+onMounted(async () => {
+  try {
+    appVersion.value = await getVersion()
+  } catch {
+    appVersion.value = '1.4.0'
+  }
+})
 
 // Update state
 const updateStatus = ref<'idle' | 'checking' | 'available' | 'up-to-date' | 'downloading' | 'error'>('idle')
@@ -162,7 +172,7 @@ function openGithub() {
         <div class="rounded-xl border p-6 text-center" style="background: var(--bg-card); border-color: var(--border-color);">
           <div class="text-4xl mb-3">📋</div>
           <h2 class="text-xl font-bold text-glow" style="color: var(--accent);">CC History</h2>
-          <p class="text-sm mt-1" style="color: var(--text-muted);">v1.4.0</p>
+          <p class="text-sm mt-1" style="color: var(--text-muted);">v{{ appVersion }}</p>
           <p class="text-sm mt-3" style="color: var(--text-secondary);">
             Claude Code 对话历史查看器
           </p>
