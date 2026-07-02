@@ -57,4 +57,5 @@ jobs:
           releaseBody: '## Changes\n\n- 支持查看 Codex 对话记录'
           releaseDraft: true
           prerelease: false
+          includeUpdaterJson: true
           args: --target ${{ matrix.target }}
