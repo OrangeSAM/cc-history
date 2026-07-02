@@ -871,6 +871,8 @@ fn get_codex_messages(rollout_path: String) -> Result<Vec<CodexMessage>, String>
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![get_projects, get_sessions, get_messages, get_session_previews, get_usage_stats, get_hermes_sessions, get_hermes_messages, get_codex_sessions, get_codex_messages])
         .setup(|app| {
             if cfg!(debug_assertions) {
