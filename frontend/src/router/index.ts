@@ -6,6 +6,7 @@ import SearchView from '../views/SearchView.vue'
 import StatsView from '../views/StatsView.vue'
 import HermesSessionView from '../views/HermesSessionView.vue'
 import CodexSessionView from '../views/CodexSessionView.vue'
+import SettingsView from '../views/SettingsView.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -45,6 +46,11 @@ const router = createRouter({
       path: '/codex/session',
       name: 'codex-session',
       component: CodexSessionView
+    },
+    {
+      path: '/settings',
+      name: 'settings',
+      component: SettingsView
     }
   ]
 })
