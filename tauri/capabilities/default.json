@@ -11,6 +11,8 @@
     "fs:allow-read-text-file",
     "fs:read-all",
     "updater:default",
-    "process:default"
+    "process:default",
+    "opener:default",
+    "opener:allow-open-url"
   ]
 }

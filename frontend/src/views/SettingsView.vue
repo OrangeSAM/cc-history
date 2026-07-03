@@ -5,6 +5,7 @@ import { useTheme } from '../composables/useTheme'
 import { check, type Update } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { getVersion } from '@tauri-apps/api/app'
+import { openUrl } from '@tauri-apps/plugin-opener'
 
 const router = useRouter()
 const { theme, toggleTheme } = useTheme()
@@ -16,7 +17,7 @@ onMounted(async () => {
   try {
     appVersion.value = await getVersion()
   } catch {
-    appVersion.value = '1.4.0'
+    appVersion.value = '1.4.1'
   }
 })
 
@@ -57,7 +58,7 @@ async function downloadAndInstall() {
 }
 
 function openGithub() {
-  window.open('https://github.com/OrangeSAM/cc-history', '_blank')
+  openUrl('https://github.com/OrangeSAM/cc-history')
 }
 </script>
 
