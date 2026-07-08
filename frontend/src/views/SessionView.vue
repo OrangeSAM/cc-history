@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { getSessions, getMessages } from '../api'
 import type { Message, ContentBlock, SessionStats } from '../types'
 import { useTheme } from '../composables/useTheme'
+import MarkdownView from '../components/MarkdownView.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -275,18 +276,6 @@ function fmtNum(n: number): string {
   return String(n)
 }
 
-function getCodeBlocks(content: string): string[] {
-  return content.match(/```[\s\S]*?```/g) || []
-}
-
-function getTextContent(content: string): string {
-  return content.replace(/```[\s\S]*?```/g, '').trim()
-}
-
-async function copyCode(code: string) {
-  await navigator.clipboard.writeText(code.replace(/```\w*\n?/g, '').trim())
-}
-
 function toolInputPreview(input: Record<string, unknown>): string {
   try {
     const str = JSON.stringify(input, null, 2)
@@ -461,19 +450,15 @@ function toolResultText(block: any): string {
                   <template v-for="(block, bi) in msg.blocks" :key="bi">
                     <!-- Text block -->
                     <div v-if="block.type === 'text'">
-                      <div v-if="getCodeBlocks((block as any).text || '').length > 0" class="space-y-3 mb-3">
-                        <div v-for="(cb, ci) in getCodeBlocks((block as any).text || '')" :key="ci" class="relative group">
-                          <button @click="copyCode(cb)" class="absolute top-2 right-2 px-2 py-1 text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity" style="background: rgba(255,255,255,0.1); color: var(--text-secondary);">Copy</button>
-                          <pre class="rounded-lg p-4 overflow-x-auto text-sm" style="background: #0d0d0d; color: var(--text-primary); font-family: 'SF Mono', monospace;"><code>{{ cb.replace(/```\w*\n?/g, '').trim() }}</code></pre>
-                        </div>
-                      </div>
-                      <div class="whitespace-pre-wrap break-words" style="color: var(--text-secondary);">{{ getTextContent((block as any).text || '') || '(empty)' }}</div>
+                      <MarkdownView v-if="(block as any).text?.trim()" :content="(block as any).text" />
                     </div>
 
                     <!-- Thinking block -->
                     <details v-else-if="block.type === 'thinking'" class="rounded-lg border" style="border-color: var(--border-color); background: var(--bg-card);">
                       <summary class="px-3 py-2 text-xs cursor-pointer" style="color: var(--text-muted);">Thinking...</summary>
-                      <div class="px-3 pb-3 text-xs whitespace-pre-wrap" style="color: var(--text-secondary);">{{ (block as any).thinking }}</div>
+                      <div class="px-3 pb-3">
+                        <MarkdownView compact :content="(block as any).thinking || ''" />
+                      </div>
                     </details>
 
                     <!-- Tool use block -->

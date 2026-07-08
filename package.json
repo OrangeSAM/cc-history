@@ -1,6 +1,6 @@
 {
   "name": "claude-history-viewer",
-  "version": "1.4.1",
+  "version": "1.5.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -14,6 +14,8 @@
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",
     "@tauri-apps/plugin-opener": "^2",
+    "dompurify": "^3.4.11",
+    "marked": "^18.0.5",
     "vue": "^3.5.30",
     "vue-router": "^4.6.4"
   },

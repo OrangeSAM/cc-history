@@ -4,6 +4,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { getHermesMessages } from '../api'
 import type { HermesMessage, Message, ContentBlock } from '../types'
 import { useTheme } from '../composables/useTheme'
+import MarkdownView from '../components/MarkdownView.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -140,10 +141,14 @@ function formatDate(timestamp: string): string {
                   <!-- Thinking block -->
                   <details v-if="block.type === 'thinking'" class="rounded-lg border" style="border-color: var(--border-color); background: var(--bg-card);">
                     <summary class="px-3 py-2 text-xs cursor-pointer" style="color: var(--text-muted);">Thinking...</summary>
-                    <div class="px-3 pb-3 text-xs whitespace-pre-wrap" style="color: var(--text-secondary);">{{ (block as any).thinking }}</div>
+                    <div class="px-3 pb-3">
+                      <MarkdownView compact :content="(block as any).thinking || ''" />
+                    </div>
                   </details>
                   <!-- Text block -->
-                  <div v-else-if="block.type === 'text'" class="whitespace-pre-wrap break-words" style="color: var(--text-secondary);">{{ (block as any).text || '(empty)' }}</div>
+                  <div v-else-if="block.type === 'text'">
+                    <MarkdownView :content="(block as any).text || ''" />
+                  </div>
                 </template>
                 <div v-if="msg.blocks.length === 0" class="whitespace-pre-wrap break-words" style="color: var(--text-secondary);">{{ msg.content || '(empty)' }}</div>
               </div>
